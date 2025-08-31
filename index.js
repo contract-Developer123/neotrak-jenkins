@@ -22,18 +22,10 @@ const { exec } = require('child_process');
 
 function generateSBOM() {
   console.log('📦 Installing CDxGen...');
-  
-  exec('npm install -g @cyclonedx/cdxgen', (error, stdout, stderr) => {
-    if (error) {
-      console.error(`❌ Error installing CDxGen: ${error.message}`);
-      return;
-    }
-    console.log(stdout);
-    console.error(stderr);
 
     console.log('🛠 Generating SBOM...');
     
-    exec('cdxgen . -o sbom.json', (error, stdout, stderr) => {
+    exec('cdxgen --version', (error, stdout, stderr) => {
       if (error) {
         console.error(`❌ Error generating SBOM: ${error.message}`);
         return;
@@ -42,7 +34,6 @@ function generateSBOM() {
       console.error(stderr);
       console.log('✅ SBOM generated in sbom.json');
     });
-  });
-}
+  };
 
 generateSBOM();
