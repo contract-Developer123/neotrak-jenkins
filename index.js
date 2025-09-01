@@ -18,22 +18,42 @@
 
 // generateSBOM();
 
+
+//////////////////////////
+
+
+// const { exec } = require('child_process');
+
+// function generateSBOM() {
+//   console.log('📦 Installing CDxGen...');
+
+//     console.log('🛠 Generating SBOM...');
+    
+//     exec('cdxgen --version', (error, stdout, stderr) => {
+//       if (error) {
+//         console.error(`❌ Error generating SBOM: ${error.message}`);
+//         return;
+//       }
+//       console.log(stdout);
+//       console.error(stderr);
+//       console.log('✅ SBOM generated in sbom.json');
+//     });
+//   };
+
+// generateSBOM();
+
+
 const { exec } = require('child_process');
 
-function generateSBOM() {
-  console.log('📦 Installing CDxGen...');
+exec('cdxgen --version', (error, stdout, stderr) => {
+  if (error) {
+    console.error(`❌ Error: ${error.message}`);
+    return;
+  }
 
-    console.log('🛠 Generating SBOM...');
-    
-    exec('cdxgen --version', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`❌ Error generating SBOM: ${error.message}`);
-        return;
-      }
-      console.log(stdout);
-      console.error(stderr);
-      console.log('✅ SBOM generated in sbom.json');
-    });
-  };
+  if (stderr) {
+    console.error(`⚠️ Stderr: ${stderr}`);
+  }
 
-generateSBOM();
+  console.log(`CDxGen version: ${stdout.trim()}`);
+});
