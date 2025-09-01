@@ -39,7 +39,7 @@ function generateSBOM() {
     console.log('Checking CDxGen version...');
 
     // Use npx to run the local binary
-    exec('npx cdxgen --version', (error, stdout, stderr) => {
+    exec('npx cdxgen . -o sbom.json', (error, stdout, stderr) => {
       if (error) {
         console.error(`Error running CDxGen: ${error.message}`);
         return;
