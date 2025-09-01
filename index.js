@@ -25,9 +25,10 @@
 const { exec } = require('child_process');
 
 function generateSBOM() {
-  console.log('📦 Installing CDxGen...');
+  console.log('Installing CDxGen...');
 
-  exec('npm install -g @cyclonedx/cdxgen', (installError, installStdout, installStderr) => {
+  // Install CDxGen locally (not globally)
+  exec('npm install @cyclonedx/cdxgen --save-dev', (installError, installStdout, installStderr) => {
     if (installError) {
       console.error(`❌ Error installing CDxGen: ${installError.message}`);
       return;
@@ -35,19 +36,21 @@ function generateSBOM() {
     console.log(installStdout);
     console.error(installStderr);
 
-    console.log('🛠 Generating SBOM...');
+    console.log('Checking CDxGen version...');
 
-    exec('cdxgen --version', (error, stdout, stderr) => {
+    // Use npx to run the local binary
+    exec('npx cdxgen --version', (error, stdout, stderr) => {
       if (error) {
-        console.error(`❌ Error generating SBOM: ${error.message}`);
+        console.error(`Error running CDxGen: ${error.message}`);
         return;
       }
       console.log(`CDxGen version: ${stdout.trim()}`);
       if (stderr) console.error(stderr);
-      console.log('✅ SBOM generation step completed.');
+      console.log('CDxGen is working.');
     });
   });
 }
 
 generateSBOM();
+
 
