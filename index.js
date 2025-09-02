@@ -2,6 +2,7 @@ const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// Ensure dependencies are installed
 function ensureDependencies() {
   const nodeModulesPath = path.join(__dirname, 'node_modules');
   const axiosPath = path.join(nodeModulesPath, 'axios');
@@ -25,7 +26,22 @@ const apiKey = process.env.X_API_KEY;
 const secretKey = process.env.X_SECRET_KEY;
 const tenantKey = process.env.X_TENANT_KEY;
 const apiUrlBase = 'https://dev.neotrak.io/open-pulse/project';
-const sbomPath = path.resolve('./sbom.json');
+
+// Use the current working directory as the project root
+const projectRoot = process.cwd();
+const sbomPath = path.resolve(projectRoot, 'sbom.json');
+
+// Detect manifest files in the user's project root
+function hasManifestFile(projectPath) {
+  const manifests = [
+    'package.json',
+    'pom.xml',
+    'build.gradle',
+    'requirements.txt',
+    '.csproj'
+  ];
+  return manifests.some(file => fs.existsSync(path.join(projectPath, file)));
+}
 
 function runCommand(cmd, callback) {
   exec(cmd, (error, stdout, stderr) => {
@@ -99,15 +115,19 @@ async function uploadSBOM() {
 }
 
 function generateSBOM() {
+  if (!hasManifestFile(projectRoot)) {
+    console.error('❌ No supported manifest file found in the project root.');
+    process.exit(1);
+  }
   console.log('🛠️ Generating SBOM...');
-  runCommand('npx cdxgen --type nodejs . -o sbom.json', async (err, stdout, stderr) => {
+  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}"`, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
       return;
     }
     console.log(stdout);
     if (stderr) console.error(stderr);
-    console.log('✅ SBOM generated as sbom.json');
+    console.log(`✅ SBOM generated as ${sbomPath}`);
     await uploadSBOM();
   });
 }
