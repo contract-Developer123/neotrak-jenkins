@@ -1,6 +1,6 @@
 {
   "name": "neotrak-jenkins",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -19,5 +19,9 @@
   "bugs": {
     "url": "https://github.com/contract-Developer123/neotrak-jenkins/issues"
   },
-  "homepage": "https://github.com/contract-Developer123/neotrak-jenkins#readme"
+  "homepage": "https://github.com/contract-Developer123/neotrak-jenkins#readme",
+  "dependencies": {
+    "axios": "^1.11.0",
+    "form-data": "^4.0.4"
+  }
 }
