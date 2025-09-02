@@ -1,7 +1,20 @@
 const { exec } = require('child_process');
 const fs = require('fs');
-const fsPromises = require('fs').promises;
 const path = require('path');
+
+function ensureDependencies() {
+  const nodeModulesPath = path.join(__dirname, 'node_modules');
+  const axiosPath = path.join(nodeModulesPath, 'axios');
+  const formDataPath = path.join(nodeModulesPath, 'form-data');
+  if (!fs.existsSync(axiosPath) || !fs.existsSync(formDataPath)) {
+    console.log('📦 Installing dependencies: axios, form-data...');
+    execSync('npm install axios form-data', { stdio: 'inherit' });
+  }
+}
+
+ensureDependencies();
+
+const fsPromises = require('fs').promises;
 const axios = require('axios');
 const FormData = require('form-data');
 
