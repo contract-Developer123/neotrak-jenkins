@@ -115,11 +115,13 @@ async function uploadSBOM() {
 }
 
 function generateSBOM() {
-  if (!hasManifestFile(projectRoot)) {
+  const foundManifests = getManifestFiles(projectRoot);
+  if (foundManifests.length === 0) {
     console.error('❌ No supported manifest file found in the project root.');
     process.exit(1);
   }
-  console.log('🛠️ Generating SBOM...');
+  console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
+  console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
   runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}"`, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
