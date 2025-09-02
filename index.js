@@ -32,7 +32,7 @@ const projectRoot = process.cwd();
 const sbomPath = path.resolve(projectRoot, 'sbom.json');
 
 // Detect manifest files in the user's project root
-function hasManifestFile(projectPath) {
+function getManifestFiles(projectPath) {
   const manifests = [
     'package.json',
     'pom.xml',
@@ -40,7 +40,7 @@ function hasManifestFile(projectPath) {
     'requirements.txt',
     '.csproj'
   ];
-  return manifests.some(file => fs.existsSync(path.join(projectPath, file)));
+  return manifests.filter(file => fs.existsSync(path.join(projectPath, file)));
 }
 
 function runCommand(cmd, callback) {
