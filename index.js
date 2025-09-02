@@ -31,6 +31,11 @@ const apiUrlBase = 'https://dev.neotrak.io/open-pulse/project';
 const projectRoot = process.cwd();
 const sbomPath = path.resolve(projectRoot, 'sbom.json');
 
+console.log(`📂 Listing files in directory: ${projectRoot}`);
+fs.readdirSync(projectRoot).forEach(file => {
+  console.log(`- ${file}`);
+});
+
 // Detect manifest files in the user's project root
 function getManifestFiles(projectPath) {
   const manifests = [
