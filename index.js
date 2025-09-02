@@ -44,7 +44,12 @@ async function uploadSBOM() {
     form.append('sbomFile', fs.createReadStream(sbomPath));
     form.append('displayName', process.env.DISPLAY_NAME || 'sbom');
 
-    let branchName = process.env.GITHUB_REF_NAME || 'main';
+    // Support branch name from GitHub Actions, GitLab CI, Jenkins, or fallback to 'main'
+    let branchName =
+      process.env.GITHUB_REF_NAME ||      // GitHub Actions
+      process.env.CI_COMMIT_REF_NAME ||   // GitLab CI
+      process.env.BRANCH_NAME ||          // Jenkins (if set)
+      'main';                            // Fallback
     form.append('branchName', branchName);
 
     if (!workspaceId || !projectId) {
