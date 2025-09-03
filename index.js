@@ -28,7 +28,7 @@ const tenantKey = process.env.X_TENANT_KEY;
 const apiUrlBase = 'https://dev.neotrak.io/open-pulse/project';
 
 // Use the current working directory as the project root
-const projectRoot = path.resolve(process.argv[2] || process.cwd());
+const projectRoot = path.resolve(process.cwd(), 'sbom-dir');
 const sbomPath = path.resolve(projectRoot, 'sbom.json');
 
 console.log(`📂 Listing files in directory: ${projectRoot}`);
