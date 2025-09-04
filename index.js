@@ -5,15 +5,20 @@ const fsPromises = require('fs').promises;
 const axios = require('axios');
 const FormData = require('form-data');
 
-// Ensure dependencies are installed
+// Ensure dependencies are installed in a temporary directory
 function ensureDependencies() {
-  const nodeModulesPath = path.join(__dirname, 'node_modules');
+  const tempDir = path.join(__dirname, 'temp_node_modules');
+  const nodeModulesPath = path.join(tempDir, 'node_modules');
   const axiosPath = path.join(nodeModulesPath, 'axios');
   const formDataPath = path.join(nodeModulesPath, 'form-data');
   if (!fs.existsSync(axiosPath) || !fs.existsSync(formDataPath)) {
-    console.log('📦 Installing dependencies: axios, form-data...');
-    execSync('npm install axios form-data', { stdio: 'inherit' });
+    console.log('📦 Installing dependencies: axios, form-data in temp directory...');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+    execSync(`npm install axios form-data --prefix ${tempDir}`, { stdio: 'inherit' });
   }
+  // Update require paths to use temp directory
+  require('module').Module._initPaths();
+  process.env.NODE_PATH = `${process.env.NODE_PATH || ''}:${nodeModulesPath}`;
 }
 
 ensureDependencies();
@@ -72,14 +77,40 @@ async function uploadSBOM() {
     const sbomSizeInMB = stats.size / (1024 * 1024);
     console.log(`📄 SBOM file size: ${sbomSizeInMB.toFixed(2)} MB`);
 
-    // Filter out axios and form-data from SBOM
+    // Read and filter SBOM
     let sbomContent = JSON.parse(await fsPromises.readFile(sbomPath, 'utf8'));
+    let originalComponentCount = sbomContent.components ? sbomContent.components.length : 0;
+    console.log(`📋 Original SBOM Components Count: ${originalComponentCount}`);
+    console.log(`📋 Original SBOM Components:`, sbomContent.components ? sbomContent.components.map(c => c.name) : 'No components');
+
+    // Filter out axios, form-data, and their transitive dependencies
+    const excludeComponents = [
+      'axios',
+      'form-data',
+      'asynckit',
+      'call-bind-apply-helpers',
+      'combined-stream',
+      'delayed-stream',
+      'dunder-proto',
+      'es-define-property',
+      'es-errors',
+      'es-object-atoms',
+      'es-set-tostringtag',
+      'follow-redirects',
+      'function-bind',
+      'get-intrinsic',
+      'get-proto',
+      'gopd',
+      'hasown'
+    ];
     if (sbomContent.components) {
       sbomContent.components = sbomContent.components.filter(component => {
         const componentName = component.name || '';
-        return !['axios', 'form-data'].includes(componentName);
+        return !excludeComponents.includes(componentName);
       });
-      console.log('✅ Filtered axios and form-data from SBOM');
+      console.log('✅ Filtered unwanted components from SBOM');
+      console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
+      console.log(`📋 Filtered SBOM Components:`, sbomContent.components.map(c => c.name));
       await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
     }
 
@@ -116,6 +147,11 @@ async function uploadSBOM() {
 
     if (response.status >= 200 && response.status < 300) {
       console.log('✅ SBOM uploaded successfully:', response.data);
+      if (response.data && response.data.componentCount) {
+        console.log(`📋 API Reported Component Count: ${response.data.componentCount}`);
+      } else {
+        console.log('📋 No component count provided in API response');
+      }
     } else {
       console.error('❌ Failed to upload SBOM. Status:', response.status);
       console.error('Response body:', response.data);
@@ -141,7 +177,7 @@ function generateSBOM() {
     '--exclude "node_modules/**"'
   ].join(' ');
 
-  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4`, async (err, stdout, stderr) => {
+  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4 --no-dev-dependencies`, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
       return;
@@ -149,11 +185,6 @@ function generateSBOM() {
     console.log(stdout);
     if (stderr) console.error(stderr);
     console.log(`✅ SBOM generated as ${sbomPath}`);
-
-    // Debug: Log SBOM components
-    const sbomContent = JSON.parse(fs.readFileSync(sbomPath, 'utf8'));
-    console.log('📋 SBOM Components:', sbomContent.components ? sbomContent.components.map(c => c.name) : 'No components found');
-
     await uploadSBOM();
   });
 }
