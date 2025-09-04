@@ -127,7 +127,15 @@ function generateSBOM() {
   }
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
-  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" --exclude "**/neotrak-jenkins/**"`, async (err, stdout, stderr) => {
+
+  const excludeFlags = [
+    '--exclude "neotrak-jenkins/**"',
+    '--exclude "node_modules/**"',
+    '--exclude "**/axios/**"',
+    '--exclude "**/form-data/**"'
+  ].join(' ');
+
+  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags}`, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
       return;
