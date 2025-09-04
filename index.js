@@ -27,7 +27,7 @@ const secretKey = process.env.X_SECRET_KEY;
 const tenantKey = process.env.X_TENANT_KEY;
 const apiUrlBase = 'https://dev.neotrak.io/open-pulse/project';
 
-const projectRoot = path.resolve(process.cwd(), 'sbom-dir');
+const projectRoot = process.cwd();
 const sbomPath = path.resolve(projectRoot, 'sbom.json');
 
 
@@ -127,7 +127,7 @@ function generateSBOM() {
   }
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
-  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}"`, async (err, stdout, stderr) => {
+  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" --exclude "**/neotrak-jenkins/**"`, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
       return;
