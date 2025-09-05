@@ -6,22 +6,22 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 // Ensure dependencies are installed in a temporary directory
-function ensureDependencies() {
-  const tempDir = path.join(__dirname, 'temp_node_modules');
-  const nodeModulesPath = path.join(tempDir, 'node_modules');
-  const axiosPath = path.join(nodeModulesPath, 'axios');
-  const formDataPath = path.join(nodeModulesPath, 'form-data');
-  if (!fs.existsSync(axiosPath) || !fs.existsSync(formDataPath)) {
-    console.log('📦 Installing dependencies: axios, form-data in temp directory...');
-    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-    execSync(`npm install axios form-data --prefix ${tempDir}`, { stdio: 'inherit' });
-  }
-  // Update require paths to use temp directory
-  require('module').Module._initPaths();
-  process.env.NODE_PATH = `${process.env.NODE_PATH || ''}:${nodeModulesPath}`;
-}
+// function ensureDependencies() {
+//   const tempDir = path.join(__dirname, 'temp_node_modules');
+//   const nodeModulesPath = path.join(tempDir, 'node_modules');
+//   const axiosPath = path.join(nodeModulesPath, 'axios');
+//   const formDataPath = path.join(nodeModulesPath, 'form-data');
+//   if (!fs.existsSync(axiosPath) || !fs.existsSync(formDataPath)) {
+//     console.log('📦 Installing dependencies: axios, form-data in temp directory...');
+//     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+//     execSync(`npm install axios form-data --prefix ${tempDir}`, { stdio: 'inherit' });
+//   }
+//   // Update require paths to use temp directory
+//   require('module').Module._initPaths();
+//   process.env.NODE_PATH = `${process.env.NODE_PATH || ''}:${nodeModulesPath}`;
+// }
 
-ensureDependencies();
+// ensureDependencies();
 
 // Environment variables
 const workspaceId = process.env.WORKSPACE_ID;
@@ -81,7 +81,6 @@ async function uploadSBOM() {
     let sbomContent = JSON.parse(await fsPromises.readFile(sbomPath, 'utf8'));
     let originalComponentCount = sbomContent.components ? sbomContent.components.length : 0;
     console.log(`📋 Original SBOM Components Count: ${originalComponentCount}`);
-    console.log(`📋 Original SBOM Components:`, sbomContent.components ? sbomContent.components.map(c => c.name) : 'No components');
 
     // Filter out axios, form-data, and their transitive dependencies
     const excludeComponents = [
@@ -120,7 +119,6 @@ async function uploadSBOM() {
       });
       console.log('✅ Filtered unwanted components from SBOM');
       console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
-      console.log(`📋 Filtered SBOM Components:`, sbomContent.components.map(c => c.name));
       await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
     }
 
