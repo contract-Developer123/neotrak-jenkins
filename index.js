@@ -112,7 +112,6 @@ async function uploadSBOM() {
       'math-intrinsics',
       '	has-tostringtag',
       'has-symbols',
-      'neotrack'
     ];
     if (sbomContent.components) {
       sbomContent.components = sbomContent.components.filter(component => {
