@@ -101,7 +101,17 @@ async function uploadSBOM() {
       'get-intrinsic',
       'get-proto',
       'gopd',
-      'hasown'
+      'hasown',
+      'has-symbols',
+      'has-tostringtag',
+      'math-intrinsics',
+      'neotrack',
+      'proxy-from-env',
+      'mime-types',
+      'mime-db',
+      'math-intrinsics',
+      '	has-tostringtag',
+      'has-symbols'
     ];
     if (sbomContent.components) {
       sbomContent.components = sbomContent.components.filter(component => {
