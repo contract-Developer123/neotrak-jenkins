@@ -111,7 +111,8 @@ async function uploadSBOM() {
       'mime-db',
       'math-intrinsics',
       '	has-tostringtag',
-      'has-symbols'
+      'has-symbols',
+      'neotrack'
     ];
     if (sbomContent.components) {
       sbomContent.components = sbomContent.components.filter(component => {
