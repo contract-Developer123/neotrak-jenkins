@@ -1,27 +1,9 @@
-const { exec, execSync } = require('child_process');
+const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const fsPromises = require('fs').promises;
 const axios = require('axios');
 const FormData = require('form-data');
-
-// Ensure dependencies are installed in a temporary directory
-// function ensureDependencies() {
-//   const tempDir = path.join(__dirname, 'temp_node_modules');
-//   const nodeModulesPath = path.join(tempDir, 'node_modules');
-//   const axiosPath = path.join(nodeModulesPath, 'axios');
-//   const formDataPath = path.join(nodeModulesPath, 'form-data');
-//   if (!fs.existsSync(axiosPath) || !fs.existsSync(formDataPath)) {
-//     console.log('📦 Installing dependencies: axios, form-data in temp directory...');
-//     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-//     execSync(`npm install axios form-data --prefix ${tempDir}`, { stdio: 'inherit' });
-//   }
-//   // Update require paths to use temp directory
-//   require('module').Module._initPaths();
-//   process.env.NODE_PATH = `${process.env.NODE_PATH || ''}:${nodeModulesPath}`;
-// }
-
-// ensureDependencies();
 
 // Environment variables
 const workspaceId = process.env.WORKSPACE_ID;
@@ -59,7 +41,7 @@ function runCommand(cmd, callback) {
 
 function installCdxgen(callback) {
   console.log('📦 Installing CDxGen...');
-  runCommand('npm install @cyclonedx/cdxgen@latest --save-dev', (err, stdout, stderr) => {
+  runCommand('npm install --no-save @cyclonedx/cdxgen@latest', (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to install CDxGen: ${err.message}`);
       return;
@@ -82,8 +64,8 @@ async function uploadSBOM() {
     let originalComponentCount = sbomContent.components ? sbomContent.components.length : 0;
     console.log(`📋 Original SBOM Components Count: ${originalComponentCount}`);
 
-    // Filter out axios, form-data, and their transitive dependencies
-    const excludeComponents = [
+    // Exclude unwanted components (case-insensitive, partial match)
+    const excludeComponents = Array.from(new Set([
       'axios',
       'form-data',
       'asynckit',
@@ -104,25 +86,36 @@ async function uploadSBOM() {
       'has-symbols',
       'has-tostringtag',
       'math-intrinsics',
-      'neotrack',
-      'proxy-from-env',
       'mime-types',
       'mime-db',
-      'math-intrinsics',
-      '	has-tostringtag',
-      'has-symbols',
-    ];
+      'neotrack',
+      'proxy-from-env'
+    ]));
+
+    const excludedPatterns = excludeComponents.map(e => e.toLowerCase().trim());
+
     if (sbomContent.components) {
       sbomContent.components = sbomContent.components.filter(component => {
-        const componentName = component.name || '';
-        return !excludeComponents.includes(componentName);
+        const name = (component.name || '').toLowerCase().trim();
+        return !excludedPatterns.some(pattern => name.includes(pattern));
       });
       console.log('✅ Filtered unwanted components from SBOM');
       console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
+
+      console.log('🧹 Filtered component names:');
+      sbomContent.components.forEach(c => console.log(`- ${c.name}`));
+
       await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
     }
 
-    const form = new FormData({ maxDataSize: 10 * 1024 * 1024 });
+    if (!sbomContent.components || sbomContent.components.length === 0) {
+  console.warn('⚠️ Warning: SBOM contains 0 components after filtering. Skipping upload.');
+  process.exit(0);
+} else {
+  console.log(`📦 Final SBOM component count to upload: ${sbomContent.components.length}`);
+}
+
+    const form = new FormData();
     form.append('sbomFile', fs.createReadStream(sbomPath));
     form.append('displayName', process.env.DISPLAY_NAME || 'sbom');
 
@@ -213,6 +206,7 @@ function checkAndGenerateSBOM() {
 }
 
 checkAndGenerateSBOM();
+
 
 
 // const { exec, execSync } = require('child_process');
