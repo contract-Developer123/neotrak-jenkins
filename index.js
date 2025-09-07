@@ -102,8 +102,8 @@ async function uploadSBOM() {
       console.log('✅ Filtered unwanted components from SBOM');
       console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
 
-      console.log('🧹 Filtered component names:');
-      sbomContent.components.forEach(c => console.log(`- ${c.name}`));
+      // console.log('🧹 Filtered component names:');
+      // sbomContent.components.forEach(c => console.log(`- ${c.name}`));
 
       await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
     }
