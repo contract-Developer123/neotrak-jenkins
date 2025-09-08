@@ -162,29 +162,33 @@ async function uploadSBOM() {
   }
 }
 
-// function installCdxgen(callback) {
-//   console.log('📦 Installing CDxGen...');
-//   const install = spawn('npm', ['install', '--no-save', '@cyclonedx/cdxgen@latest'], { stdio: 'inherit' });
+// Helper for spawning commands on Windows (cmd /c) and other platforms
+const isWindows = process.platform === 'win32';
 
-//   install.on('close', (code) => {
-//     if (code === 0) {
-//       callback();
-//     } else {
-//       console.error(`❌ Failed to install CDxGen, exit code ${code}`);
-//       process.exit(1);
-//     }
-//   });
-// }
+function spawnCommand(command, args, options = {}) {
+  if (isWindows) {
+    args = ['/c', command, ...args];
+    command = 'cmd';
+  }
+  return spawn(command, args, options);
+}
+
 function installCdxgen(callback) {
   console.log('📦 Installing CDxGen...');
-  runCommand('cmd /c npm install --no-save @cyclonedx/cdxgen@latest', (err, stdout, stderr) => {
-    if (err) {
-      console.error(`❌ Failed to install CDxGen: ${err.message}`);
+  const install = spawnCommand('npm', ['install', '--no-save', '@cyclonedx/cdxgen@latest'], { stdio: 'inherit' });
+
+  install.on('close', (code) => {
+    if (code === 0) {
+      callback();
+    } else {
+      console.error(`❌ Failed to install CDxGen, exit code ${code}`);
       process.exit(1);
     }
-    console.log(stdout);
-    if (stderr) console.error(stderr);
-    callback();
+  });
+
+  install.on('error', (err) => {
+    console.error('❌ Error installing CDxGen:', err);
+    process.exit(1);
   });
 }
 
@@ -207,7 +211,7 @@ function generateSBOM() {
     '--no-dev-dependencies'
   ];
 
-  const cdxgen = spawn('npx', ['cdxgen', ...cdxgenArgs], { stdio: 'inherit' });
+  const cdxgen = spawnCommand('npx', ['cdxgen', ...cdxgenArgs], { stdio: 'inherit' });
 
   cdxgen.on('error', (err) => {
     console.error('❌ Failed to start cdxgen:', err);
@@ -232,7 +236,7 @@ function generateSBOM() {
 
 function checkAndGenerateSBOM() {
   console.log('🔍 Checking if CDxGen is already installed...');
-  const check = spawn('npx', ['cdxgen', '--version']);
+  const check = spawnCommand('npx', ['cdxgen', '--version']);
 
   let output = '';
   let errorOutput = '';
@@ -267,7 +271,6 @@ function checkAndGenerateSBOM() {
 }
 
 checkAndGenerateSBOM();
-
 
 
 
