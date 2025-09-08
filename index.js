@@ -162,17 +162,29 @@ async function uploadSBOM() {
   }
 }
 
+// function installCdxgen(callback) {
+//   console.log('📦 Installing CDxGen...');
+//   const install = spawn('npm', ['install', '--no-save', '@cyclonedx/cdxgen@latest'], { stdio: 'inherit' });
+
+//   install.on('close', (code) => {
+//     if (code === 0) {
+//       callback();
+//     } else {
+//       console.error(`❌ Failed to install CDxGen, exit code ${code}`);
+//       process.exit(1);
+//     }
+//   });
+// }
 function installCdxgen(callback) {
   console.log('📦 Installing CDxGen...');
-  const install = spawn('npm', ['install', '--no-save', '@cyclonedx/cdxgen@latest'], { stdio: 'inherit' });
-
-  install.on('close', (code) => {
-    if (code === 0) {
-      callback();
-    } else {
-      console.error(`❌ Failed to install CDxGen, exit code ${code}`);
+  runCommand('cmd /c npm install --no-save @cyclonedx/cdxgen@latest', (err, stdout, stderr) => {
+    if (err) {
+      console.error(`❌ Failed to install CDxGen: ${err.message}`);
       process.exit(1);
     }
+    console.log(stdout);
+    if (stderr) console.error(stderr);
+    callback();
   });
 }
 
