@@ -190,6 +190,7 @@ function generateSBOM() {
     console.error('❌ No supported manifest file found in the project root.');
     process.exit(1);
   }
+
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
 
@@ -198,11 +199,15 @@ function generateSBOM() {
     '--exclude "node_modules/**"'
   ].join(' ');
 
-  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4 --no-dev-dependencies --no-deps`, async (err, stdout, stderr) => {
+  // Set package manager to npm to avoid yarn-related issues and generate only top-level prod deps
+  const command = `cmd /c "set CDXGEN_PACKAGE_MANAGER=npm && npx cdxgen . -o sbom.json ${excludeFlags} --spec-version 1.4 --no-dev-dependencies --no-deps"`;
+
+  runCommand(command, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
       return;
     }
+
     console.log(stdout);
     if (stderr) console.error(stderr);
     console.log(`✅ SBOM generated as ${sbomPath}`);
