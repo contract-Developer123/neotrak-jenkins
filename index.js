@@ -1,7 +1,27 @@
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const fsPromises = require('fs').promises;
+
+function ensureDependencyInstalled(packageName) {
+  try {
+    require.resolve(packageName);
+  } catch (e) {
+    console.warn(`📦 '${packageName}' not found. Installing...`);
+    try {
+      execSync(`npm install ${packageName}`, { stdio: 'inherit' });
+      console.log(`✅ '${packageName}' installed successfully.`);
+    } catch (installErr) {
+      console.error(`❌ Failed to install '${packageName}':`, installErr);
+      process.exit(1);
+    }
+  }
+}
+
+// Check and install required packages
+ensureDependencyInstalled('axios');
+ensureDependencyInstalled('form-data');
+
 const axios = require('axios');
 const FormData = require('form-data');
 
