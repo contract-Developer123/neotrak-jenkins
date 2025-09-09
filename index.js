@@ -41,7 +41,7 @@ fs.readdirSync(projectRoot).forEach(file => {
   console.log(`- ${file}`);
 });
 
-// Detect manifest files in the user's project root
+// Detect supported manifest files in the user's project root
 function getManifestFiles(projectPath) {
   const manifests = [
     'package.json',
@@ -86,30 +86,11 @@ async function uploadSBOM() {
 
     // Exclude unwanted components (case-insensitive, partial match)
     const excludeComponents = Array.from(new Set([
-      'axios',
-      'form-data',
-      'asynckit',
-      'call-bind-apply-helpers',
-      'combined-stream',
-      'delayed-stream',
-      'dunder-proto',
-      'es-define-property',
-      'es-errors',
-      'es-object-atoms',
-      'es-set-tostringtag',
-      'follow-redirects',
-      'function-bind',
-      'get-intrinsic',
-      'get-proto',
-      'gopd',
-      'hasown',
-      'has-symbols',
-      'has-tostringtag',
-      'math-intrinsics',
-      'mime-types',
-      'mime-db',
-      'neotrack',
-      'proxy-from-env'
+      'axios', 'form-data', 'asynckit', 'call-bind-apply-helpers', 'combined-stream',
+      'delayed-stream', 'dunder-proto', 'es-define-property', 'es-errors', 'es-object-atoms',
+      'es-set-tostringtag', 'follow-redirects', 'function-bind', 'get-intrinsic', 'get-proto',
+      'gopd', 'hasown', 'has-symbols', 'has-tostringtag', 'math-intrinsics', 'mime-types',
+      'mime-db', 'neotrack', 'proxy-from-env'
     ]));
 
     const excludedPatterns = excludeComponents.map(e => e.toLowerCase().trim());
@@ -121,9 +102,6 @@ async function uploadSBOM() {
       });
       console.log('✅ Filtered unwanted components from SBOM');
       console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
-
-      // console.log('🧹 Filtered component names:');
-      // sbomContent.components.forEach(c => console.log(`- ${c.name}`));
 
       await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
     }
@@ -194,9 +172,22 @@ function generateSBOM() {
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
   console.log(`📍 Current working directory: ${process.cwd()}`);
-   const manifestFile = foundManifests[0];
-  // Use the exact command that works locally
-  const command = `npx cdxgen ${manifestFile} -o "${sbomPath}" --exclude "neotrak-jenkins" --exclude "neotrak-jenkins/**" --exclude "node_modules/**"`;
+
+  const manifestFile = foundManifests[0]; // Just use the first found manifest file
+  
+  // Build the correct command for SBOM generation based on the manifest type
+  let command;
+  if (manifestFile === 'package.json') {
+    command = `npx cdxgen ${manifestFile} -o "${sbomPath}" --exclude "node_modules/**"`;
+  } else if (manifestFile === 'pom.xml') {
+    command = `npx cdxgen --type maven ${manifestFile} -o "${sbomPath}"`;
+  } else if (manifestFile === 'build.gradle') {
+    command = `npx cdxgen --type gradle ${manifestFile} -o "${sbomPath}"`;
+  } else if (manifestFile === 'requirements.txt') {
+    command = `npx cdxgen --type python ${manifestFile} -o "${sbomPath}"`;
+  } else if (manifestFile === '.csproj') {
+    command = `npx cdxgen --type dotnet ${manifestFile} -o "${sbomPath}"`;
+  }
 
   runCommand(command, async (err, stdout, stderr) => {
     if (err) {
@@ -217,10 +208,8 @@ function checkAndGenerateSBOM() {
       console.log(`✅ CDxGen is already installed: ${stdout}`);
       generateSBOM();
     } else {
-      console.warn('⚠️ CDxGen not found. Installing...');
-      installCdxgen(() => {
-        generateSBOM();
-      });
+      console.warn('⚠️ CDxGen not installed. Installing now...');
+      installCdxgen(generateSBOM);
     }
   });
 }
