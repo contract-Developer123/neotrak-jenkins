@@ -194,9 +194,9 @@ function generateSBOM() {
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
   console.log(`📍 Current working directory: ${process.cwd()}`);
-
+   const manifestFile = foundManifests[0];
   // Use the exact command that works locally
-  const command = `npx cdxgen . -o "${sbomPath}"`;
+  const command = `npx cdxgen ${manifestFile} -o "${sbomPath}" --exclude "neotrak-jenkins" --exclude "neotrak-jenkins/**" --exclude "node_modules/**"`;
 
   runCommand(command, async (err, stdout, stderr) => {
     if (err) {
