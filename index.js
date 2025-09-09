@@ -196,7 +196,7 @@ function generateSBOM() {
   console.log(`📍 Current working directory: ${process.cwd()}`);
 
   // Use the exact command that works locally
-  const command = `npx cdxgen . -o "${sbomPath}" --exclude "neotrak-jenkins/**" --exclude "node_modules/**"`;
+  const command = `npx cdxgen . -o "${sbomPath}"`;
 
   runCommand(command, async (err, stdout, stderr) => {
     if (err) {
