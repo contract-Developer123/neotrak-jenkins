@@ -60,54 +60,13 @@ async function uploadSBOM() {
     const sbomSizeInMB = stats.size / (1024 * 1024);
     console.log(`📄 SBOM file size: ${sbomSizeInMB.toFixed(2)} MB`);
 
-    // Read and filter SBOM
+    // Read SBOM content
     let sbomContent = JSON.parse(await fsPromises.readFile(sbomPath, 'utf8'));
     let originalComponentCount = sbomContent.components ? sbomContent.components.length : 0;
     console.log(`📋 Original SBOM Components Count: ${originalComponentCount}`);
 
-    // Exclude unwanted components (case-insensitive, partial match)
-    const excludeComponents = Array.from(new Set([
-      'axios',
-      'form-data',
-      'asynckit',
-      'call-bind-apply-helpers',
-      'combined-stream',
-      'delayed-stream',
-      'dunder-proto',
-      'es-define-property',
-      'es-errors',
-      'es-object-atoms',
-      'es-set-tostringtag',
-      'follow-redirects',
-      'function-bind',
-      'get-intrinsic',
-      'get-proto',
-      'gopd',
-      'hasown',
-      'has-symbols',
-      'has-tostringtag',
-      'math-intrinsics',
-      'mime-types',
-      'mime-db',
-      'neotrack',
-      'proxy-from-env'
-    ]));
-
-    const excludedPatterns = excludeComponents.map(e => e.toLowerCase().trim());
-
-    if (sbomContent.components) {
-      sbomContent.components = sbomContent.components.filter(component => {
-        const name = (component.name || '').toLowerCase().trim();
-        return !excludedPatterns.some(pattern => name.includes(pattern));
-      });
-      console.log('✅ Filtered unwanted components from SBOM');
-      console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
-
-      await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
-    }
-
     if (!sbomContent.components || sbomContent.components.length === 0) {
-      console.warn('⚠️ Warning: SBOM contains 0 components after filtering. Skipping upload.');
+      console.warn('⚠️ Warning: SBOM contains 0 components. Skipping upload.');
       process.exit(0);
     } else {
       console.log(`📦 Final SBOM component count to upload: ${sbomContent.components.length}`);
