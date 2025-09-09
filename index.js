@@ -423,23 +423,45 @@ async function uploadSBOM() {
   }
 }
 
+// function generateSBOM() {
+//   const foundManifests = getManifestFiles(projectRoot);
+//   if (foundManifests.length === 0) {
+//     console.error('❌ No supported manifest file found in the project root.');
+//     process.exit(1);
+//   }
+//   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
+//   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
+
+//   const excludeFlags = [
+//     '--exclude "neotrak-jenkins/**"',
+//     '--exclude "node_modules/**"'
+//   ].join(' ');
+
+//   runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4 --no-dev-dependencies`, async (err, stdout, stderr) => {
+//     if (err) {
+//       console.error(`❌ Failed to generate SBOM: ${err.message}`);
+//       return;
+//     }
+//     console.log(stdout);
+//     if (stderr) console.error(stderr);
+//     console.log(`✅ SBOM generated as ${sbomPath}`);
+//     await uploadSBOM();
+//   });
+// }
 function generateSBOM() {
   const foundManifests = getManifestFiles(projectRoot);
   if (foundManifests.length === 0) {
     console.error('❌ No supported manifest file found in the project root.');
     process.exit(1);
   }
+
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
 
-  const excludeFlags = [
-    '--exclude "neotrak-jenkins/**"',
-    '--exclude "node_modules/**"'
-  ].join(' ');
+  // Use proper escape syntax for Windows paths and quotes
+  const command = `npx cdxgen . -o "${sbomPath}" --exclude "neotrak-jenkins/**" --exclude "node_modules/**"`;
 
-//   runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4 --no-dev-dependencies`, async (err, stdout, stderr) => {
-     runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4 `, async (err, stdout, stderr) => {
-
+  runCommand(command, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
       return;
