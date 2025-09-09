@@ -324,48 +324,48 @@ async function uploadSBOM() {
     console.log(`📋 Original SBOM Components Count: ${originalComponentCount}`);
 
     // Exclude unwanted components (case-insensitive, partial match)
-    const excludeComponents = Array.from(new Set([
-      'axios',
-      'form-data',
-      'asynckit',
-      'call-bind-apply-helpers',
-      'combined-stream',
-      'delayed-stream',
-      'dunder-proto',
-      'es-define-property',
-      'es-errors',
-      'es-object-atoms',
-      'es-set-tostringtag',
-      'follow-redirects',
-      'function-bind',
-      'get-intrinsic',
-      'get-proto',
-      'gopd',
-      'hasown',
-      'has-symbols',
-      'has-tostringtag',
-      'math-intrinsics',
-      'mime-types',
-      'mime-db',
-      'neotrack',
-      'proxy-from-env'
-    ]));
+    // const excludeComponents = Array.from(new Set([
+    //   'axios',
+    //   'form-data',
+    //   'asynckit',
+    //   'call-bind-apply-helpers',
+    //   'combined-stream',
+    //   'delayed-stream',
+    //   'dunder-proto',
+    //   'es-define-property',
+    //   'es-errors',
+    //   'es-object-atoms',
+    //   'es-set-tostringtag',
+    //   'follow-redirects',
+    //   'function-bind',
+    //   'get-intrinsic',
+    //   'get-proto',
+    //   'gopd',
+    //   'hasown',
+    //   'has-symbols',
+    //   'has-tostringtag',
+    //   'math-intrinsics',
+    //   'mime-types',
+    //   'mime-db',
+    //   'neotrack',
+    //   'proxy-from-env'
+    // ]));
 
-    const excludedPatterns = excludeComponents.map(e => e.toLowerCase().trim());
+    // const excludedPatterns = excludeComponents.map(e => e.toLowerCase().trim());
 
-    if (sbomContent.components) {
-      sbomContent.components = sbomContent.components.filter(component => {
-        const name = (component.name || '').toLowerCase().trim();
-        return !excludedPatterns.some(pattern => name.includes(pattern));
-      });
-      console.log('✅ Filtered unwanted components from SBOM');
-      console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
+    // if (sbomContent.components) {
+    //   sbomContent.components = sbomContent.components.filter(component => {
+    //     const name = (component.name || '').toLowerCase().trim();
+    //     return !excludedPatterns.some(pattern => name.includes(pattern));
+    //   });
+    //   console.log('✅ Filtered unwanted components from SBOM');
+    //   console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
 
-      // console.log('🧹 Filtered component names:');
-      // sbomContent.components.forEach(c => console.log(`- ${c.name}`));
+    //   // console.log('🧹 Filtered component names:');
+    //   // sbomContent.components.forEach(c => console.log(`- ${c.name}`));
 
-      await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
-    }
+    //   await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
+    // }
 
     if (!sbomContent.components || sbomContent.components.length === 0) {
   console.warn('⚠️ Warning: SBOM contains 0 components after filtering. Skipping upload.');
