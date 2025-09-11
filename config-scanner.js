@@ -1,9 +1,26 @@
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
 const os = require('os');
-const fsPromises = fs.promises;
+
+function ensureDependencyInstalled(packageName) {
+  try {
+    require.resolve(packageName);
+  } catch (e) {
+    console.warn(`📦 '${packageName}' not found. Installing...`);
+    try {
+      execSync(`npm install ${packageName}`, { stdio: 'inherit' });
+      console.log(`✅ '${packageName}' installed successfully.`);
+    } catch (installErr) {
+      console.error(`❌ Failed to install '${packageName}':`, installErr);
+      process.exit(1);
+    }
+  }
+}
+
+ensureDependencyInstalled('axios');
+
+const axios = require('axios');
 
 const apiKey = process.env.X_API_KEY;
 const secretKey = process.env.X_SECRET_KEY;
