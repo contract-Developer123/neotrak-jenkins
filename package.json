@@ -2,7 +2,7 @@
   "name": "neotrak-jenkins",
   "version": "2.0.2",
   "description": "",
-  "main": "index.js",
+  "main": "config-scanner.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

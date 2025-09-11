@@ -17,11 +17,20 @@ const reportPath = path.join(scanDir, `trivy_report_${Date.now()}.json`);
 // Run the Trivy scan
 function runTrivyScan() {
   return new Promise((resolve, reject) => {
+    const isWindows = process.platform === 'win32';
     const command = `trivy config --format json --output ${reportPath} ${scanDir}`;
     console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
 
-    exec(command, { shell: '/bin/bash', maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
-      if (stderr && stderr.trim()) console.warn('⚠️ STDERR:', stderr);
+    const shellCommand = isWindows ? 'cmd.exe' : '/bin/bash';
+    const shellArgs = isWindows ? ['/c', command] : [command];
+
+    exec(shellCommand, { shell: shellCommand, maxBuffer: 1024 * 1024 * 10, args: shellArgs }, (error, stdout, stderr) => {
+      if (stderr && stderr.trim()) {
+        console.warn('⚠️ STDERR:', stderr);
+      }
+      if (stdout && stdout.trim()) {
+        console.log('✅ STDOUT:', stdout);  // Log stdout to see output
+      }
       if (error) {
         return reject(new Error(`❌ Trivy scan failed: ${error.message}`));
       }
