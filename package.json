@@ -4,9 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js", 
-    "trivy-scan": "node config-scanner.js" 
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
@@ -17,7 +15,7 @@
     "form-data": "^4.0.0"
   },
   "bin": {
-    "neotrak-jenkins": "./index.js"
+    "neotrak-jenkins": "./config-scanner.js"
   },
   "keywords": [],
   "author": "",
