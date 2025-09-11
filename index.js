@@ -391,7 +391,7 @@ async function uploadSBOM() {
       process.exit(1);
     }
 
-    const apiUrl = `${apiUrlBase}/${workspaceId}/${projectId}/update-sbom`;
+    const apiUrl = `${apiUrlBase}/${projectId}/update-sbom`;
     const headers = { ...form.getHeaders() };
     if (apiKey) headers['x-api-key'] = apiKey;
     if (secretKey) headers['x-secret-key'] = secretKey;
@@ -489,4 +489,4 @@ function checkAndGenerateSBOM() {
   });
 }
 
-checkAndGenerateSBOM();
+checkAndGenerateSBOM();w
