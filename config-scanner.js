@@ -1,5 +1,3 @@
-// trivyScan.js
-
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -20,6 +18,7 @@ function runTrivyScan() {
     const isWindows = process.platform === 'win32';
     const command = `trivy config --format json --output ${reportPath} ${scanDir}`;
     console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
+    console.log(`Executing command: ${command}`);
 
     const shellCommand = isWindows ? 'cmd.exe' : '/bin/bash';
     const shellArgs = isWindows ? ['/c', command] : [command];
@@ -32,6 +31,7 @@ function runTrivyScan() {
         console.log('✅ STDOUT:', stdout);  // Log stdout to see output
       }
       if (error) {
+        console.error('❌ Error running Trivy command:', error.message);
         return reject(new Error(`❌ Trivy scan failed: ${error.message}`));
       }
       resolve();
@@ -42,11 +42,16 @@ function runTrivyScan() {
 // Parse the Trivy JSON report
 function parseReport(reportPath) {
   return new Promise((resolve, reject) => {
+    console.log(`📖 Parsing Trivy report from: ${reportPath}`);
     fs.readFile(reportPath, 'utf8', (err, data) => {
-      if (err) return reject(err);
+      if (err) {
+        console.error('❌ Error reading report file:', err);
+        return reject(err);
+      }
 
       try {
         const report = JSON.parse(data);
+        console.log('✅ Report parsed successfully.');
         const results = Array.isArray(report.Results) ? report.Results : [];
 
         const structuredReport = {
@@ -69,6 +74,7 @@ function parseReport(reportPath) {
 
         resolve(structuredReport);
       } catch (e) {
+        console.error('❌ Error parsing Trivy JSON:', e.message);
         reject(new Error(`❌ Failed to parse Trivy report JSON: ${e.message}`));
       }
     });
@@ -77,6 +83,7 @@ function parseReport(reportPath) {
 
 // Send the parsed report to the API
 async function sendToAPI(payload) {
+  console.log('📤 Sending report to API...');
   if (!apiKey || !secretKey || !tenantKey || !projectId) {
     console.error("❌ Missing API credentials or project ID.");
     return;
@@ -107,17 +114,21 @@ async function sendToAPI(payload) {
 
 // Run Trivy scan, process the report, and send it to the API
 async function run() {
+  console.log('🚀 Starting Trivy scan process...');
   try {
     // Step 1: Run the Trivy scan
+    console.log(`🔄 Running Trivy scan...`);
     await runTrivyScan();
     console.log(`✅ Trivy scan completed. Report saved to: ${reportPath}`);
 
     // Step 2: Parse the Trivy JSON report
+    console.log('🔄 Parsing Trivy report...');
     const report = await parseReport(reportPath);
     console.log("📦 Trivy Scan Result:");
     console.log(JSON.stringify(report, null, 2));
 
     // Step 3: Send the parsed report to the API
+    console.log('🔄 Sending parsed report to API...');
     await sendToAPI(report);
 
     // Step 4: Check if any critical issues were found
