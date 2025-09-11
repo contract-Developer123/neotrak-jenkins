@@ -2,6 +2,8 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const os = require('os');
+const fsPromises = fs.promises;
 
 const apiKey = process.env.X_API_KEY;
 const secretKey = process.env.X_SECRET_KEY;
@@ -12,10 +14,58 @@ const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-configs/${proje
 const scanDir = process.env.SCAN_DIR || process.cwd();  // Can be set in Jenkins
 const reportPath = path.join(scanDir, `trivy_report_${Date.now()}.json`);
 
+// Function to check if Trivy is installed
+function checkTrivyInstalled() {
+  return new Promise((resolve, reject) => {
+    const command = os.platform() === 'win32' ? 'where trivy' : 'which trivy';
+    exec(command, (error, stdout, stderr) => {
+      if (error || stderr) {
+        reject(new Error("❌ Trivy is not installed or not found in PATH."));
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
+
+// Function to install Trivy (based on OS)
+function installTrivy() {
+  return new Promise((resolve, reject) => {
+    const isWindows = os.platform() === 'win32';
+    let installCommand = '';
+
+    if (isWindows) {
+      // Windows installation using Chocolatey or winget
+      installCommand = 'choco install trivy -y';
+      console.log('🔄 Installing Trivy on Windows...');
+    } else if (os.platform() === 'linux') {
+      // Linux installation (Debian/Ubuntu)
+      installCommand = 'sudo apt-get install -y wget && wget https://github.com/aquasecurity/trivy/releases/download/v0.34.0/trivy_0.34.0_Linux-64bit.deb && sudo dpkg -i trivy_0.34.0_Linux-64bit.deb';
+      console.log('🔄 Installing Trivy on Linux...');
+    } else if (os.platform() === 'darwin') {
+      // macOS installation using Homebrew
+      installCommand = 'brew install aquasecurity/trivy/trivy';
+      console.log('🔄 Installing Trivy on macOS...');
+    } else {
+      reject(new Error('❌ Unsupported OS for automatic Trivy installation.'));
+      return;
+    }
+
+    exec(installCommand, (error, stdout, stderr) => {
+      if (error || stderr) {
+        reject(new Error(`❌ Failed to install Trivy: ${stderr || error.message}`));
+      } else {
+        console.log(`✅ Trivy installed successfully. Output: ${stdout}`);
+        resolve();
+      }
+    });
+  });
+}
+
 // Run the Trivy scan
 function runTrivyScan() {
   return new Promise((resolve, reject) => {
-    const isWindows = process.platform === 'win32';
+    const isWindows = os.platform() === 'win32';
     const command = `trivy config --format json --output ${reportPath} ${scanDir}`;
     console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
     console.log(`Executing command: ${command}`);
@@ -31,7 +81,6 @@ function runTrivyScan() {
         console.log('✅ STDOUT:', stdout);  // Log stdout to see output
       }
       if (error) {
-        console.error('❌ Error running Trivy command:', error.message);
         return reject(new Error(`❌ Trivy scan failed: ${error.message}`));
       }
       resolve();
@@ -42,16 +91,11 @@ function runTrivyScan() {
 // Parse the Trivy JSON report
 function parseReport(reportPath) {
   return new Promise((resolve, reject) => {
-    console.log(`📖 Parsing Trivy report from: ${reportPath}`);
     fs.readFile(reportPath, 'utf8', (err, data) => {
-      if (err) {
-        console.error('❌ Error reading report file:', err);
-        return reject(err);
-      }
+      if (err) return reject(err);
 
       try {
         const report = JSON.parse(data);
-        console.log('✅ Report parsed successfully.');
         const results = Array.isArray(report.Results) ? report.Results : [];
 
         const structuredReport = {
@@ -74,7 +118,6 @@ function parseReport(reportPath) {
 
         resolve(structuredReport);
       } catch (e) {
-        console.error('❌ Error parsing Trivy JSON:', e.message);
         reject(new Error(`❌ Failed to parse Trivy report JSON: ${e.message}`));
       }
     });
@@ -83,7 +126,6 @@ function parseReport(reportPath) {
 
 // Send the parsed report to the API
 async function sendToAPI(payload) {
-  console.log('📤 Sending report to API...');
   if (!apiKey || !secretKey || !tenantKey || !projectId) {
     console.error("❌ Missing API credentials or project ID.");
     return;
@@ -114,24 +156,29 @@ async function sendToAPI(payload) {
 
 // Run Trivy scan, process the report, and send it to the API
 async function run() {
-  console.log('🚀 Starting Trivy scan process...');
   try {
-    // Step 1: Run the Trivy scan
-    console.log(`🔄 Running Trivy scan...`);
+    // Step 1: Check if Trivy is installed
+    try {
+      await checkTrivyInstalled();
+      console.log('✅ Trivy is already installed.');
+    } catch (e) {
+      console.log('❌ Trivy not found.');
+      await installTrivy();  // Install Trivy if not found
+    }
+
+    // Step 2: Run the Trivy scan
     await runTrivyScan();
     console.log(`✅ Trivy scan completed. Report saved to: ${reportPath}`);
 
-    // Step 2: Parse the Trivy JSON report
-    console.log('🔄 Parsing Trivy report...');
+    // Step 3: Parse the Trivy JSON report
     const report = await parseReport(reportPath);
     console.log("📦 Trivy Scan Result:");
     console.log(JSON.stringify(report, null, 2));
 
-    // Step 3: Send the parsed report to the API
-    console.log('🔄 Sending parsed report to API...');
+    // Step 4: Send the parsed report to the API
     await sendToAPI(report);
 
-    // Step 4: Check if any critical issues were found
+    // Step 5: Check if any critical issues were found
     const flatIssues = report.Results.flatMap(r => r.Misconfigurations || []);
     if (flatIssues.some(i => i.Severity === 'CRITICAL')) {
       console.error("❌ Critical misconfigurations found.");
