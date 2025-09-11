@@ -489,4 +489,4 @@ function checkAndGenerateSBOM() {
   });
 }
 
-checkAndGenerateSBOM();w
+checkAndGenerateSBOM();
