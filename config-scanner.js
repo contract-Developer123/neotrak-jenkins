@@ -83,7 +83,14 @@ function installTrivy() {
 function runTrivyScan() {
   return new Promise((resolve, reject) => {
     const isWindows = os.platform() === 'win32';
-    const command = `trivy config --format json --output ${reportPath} ${scanDir}`;
+    const command = `trivy config \
+  --debug \
+  --severity LOW,MEDIUM,HIGH,CRITICAL \
+  --skip-dirs node_modules,.git,build \
+  --format json \
+  --output "${reportPath}" \
+  "${scanDir}"`;
+
     console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
     console.log(`Executing command: ${command}`);
 
