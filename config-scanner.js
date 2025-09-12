@@ -79,34 +79,6 @@ function installTrivy() {
   });
 }
 
-// Run the Trivy scan
-// function runTrivyScan() {
-//   return new Promise((resolve, reject) => {
-//     const isWindows = os.platform() === 'win32';
-//     // const command = `trivy config --severity LOW,MEDIUM,HIGH,CRITICAL --format json --output "${reportPath}" "${scanDir}"`;
-//     const command = `trivy config --severity LOW,MEDIUM,HIGH,CRITICAL --skip-dirs neotrak-jenkins,node_modules,.git,build --format json --output "${reportPath}" "${scanDir}"`;
-
-//     console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
-//     console.log(`Executing command: ${command}`);
-
-//     const shellCommand = isWindows ? 'cmd.exe' : '/bin/bash';
-//     const shellArgs = isWindows ? ['/c', command] : [command];
-
-//     exec(shellCommand, { shell: shellCommand, maxBuffer: 1024 * 1024 * 10, args: shellArgs }, (error, stdout, stderr) => {
-//       if (stderr && stderr.trim()) {
-//         console.warn('⚠️ STDERR:', stderr);
-//       }
-//       if (stdout && stdout.trim()) {
-//         console.log('✅ STDOUT:', stdout);  // Log stdout to see output
-//       }
-//       if (error) {
-//         return reject(new Error(`❌ Trivy scan failed: ${error.message}`));
-//       }
-//       resolve();
-//     });
-//   });
-// }
-
 async function runTrivyScan(scanDir, reportPath) {
   return new Promise((resolve, reject) => {
     const args = [
