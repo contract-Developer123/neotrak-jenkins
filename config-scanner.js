@@ -205,6 +205,12 @@ async function run() {
     console.log("📦 Trivy Scan Result:");
     console.log(JSON.stringify(report, null, 2));
 
+    const hasResults = Array.isArray(report.Results) && report.Results.length > 0;
+
+    if (!hasResults) {
+      console.log("ℹ️ No config files detected by Trivy. Skipping API call.");
+      return; // Exit early, don't send to API
+    }
     // Step 4: Send the parsed report to the API
     await sendToAPI(report);
 
