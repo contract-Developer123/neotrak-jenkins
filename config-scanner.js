@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -80,32 +80,79 @@ function installTrivy() {
 }
 
 // Run the Trivy scan
-function runTrivyScan() {
+// function runTrivyScan() {
+//   return new Promise((resolve, reject) => {
+//     const isWindows = os.platform() === 'win32';
+//     // const command = `trivy config --severity LOW,MEDIUM,HIGH,CRITICAL --format json --output "${reportPath}" "${scanDir}"`;
+//     const command = `trivy config --severity LOW,MEDIUM,HIGH,CRITICAL --skip-dirs neotrak-jenkins,node_modules,.git,build --format json --output "${reportPath}" "${scanDir}"`;
+
+//     console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
+//     console.log(`Executing command: ${command}`);
+
+//     const shellCommand = isWindows ? 'cmd.exe' : '/bin/bash';
+//     const shellArgs = isWindows ? ['/c', command] : [command];
+
+//     exec(shellCommand, { shell: shellCommand, maxBuffer: 1024 * 1024 * 10, args: shellArgs }, (error, stdout, stderr) => {
+//       if (stderr && stderr.trim()) {
+//         console.warn('⚠️ STDERR:', stderr);
+//       }
+//       if (stdout && stdout.trim()) {
+//         console.log('✅ STDOUT:', stdout);  // Log stdout to see output
+//       }
+//       if (error) {
+//         return reject(new Error(`❌ Trivy scan failed: ${error.message}`));
+//       }
+//       resolve();
+//     });
+//   });
+// }
+async function runTrivyScan(scanDir, reportPath) {
   return new Promise((resolve, reject) => {
-    const isWindows = os.platform() === 'win32';
-    // const command = `trivy config --severity LOW,MEDIUM,HIGH,CRITICAL --format json --output "${reportPath}" "${scanDir}"`;
-    const command = `trivy config --severity LOW,MEDIUM,HIGH,CRITICAL --skip-dirs neotrak-jenkins,node_modules,.git,build --format json --output "${reportPath}" "${scanDir}"`;
+    const args = [
+      'config',
+      '--severity', 'LOW,MEDIUM,HIGH,CRITICAL',
+      '--skip-dirs', 'neotrak-jenkins,node_modules,.git,build',
+      '--format', 'json',
+      '--output', reportPath,
+      scanDir
+    ];
 
     console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
-    console.log(`Executing command: ${command}`);
+    console.log(`Executing command: trivy ${args.join(' ')}`);
 
-    const shellCommand = isWindows ? 'cmd.exe' : '/bin/bash';
-    const shellArgs = isWindows ? ['/c', command] : [command];
+    const trivyProcess = spawn('trivy', args);
 
-    exec(shellCommand, { shell: shellCommand, maxBuffer: 1024 * 1024 * 10, args: shellArgs }, (error, stdout, stderr) => {
-      if (stderr && stderr.trim()) {
-        console.warn('⚠️ STDERR:', stderr);
+    trivyProcess.stdout.on('data', (data) => {
+      process.stdout.write(`STDOUT: ${data}`);
+    });
+
+    trivyProcess.stderr.on('data', (data) => {
+      process.stderr.write(`STDERR: ${data}`);
+    });
+
+    trivyProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log('✅ Trivy scan completed successfully.');
+        resolve();
+      } else {
+        reject(new Error(`❌ Trivy scan failed with exit code ${code}`));
       }
-      if (stdout && stdout.trim()) {
-        console.log('✅ STDOUT:', stdout);  // Log stdout to see output
-      }
-      if (error) {
-        return reject(new Error(`❌ Trivy scan failed: ${error.message}`));
-      }
-      resolve();
+    });
+
+    trivyProcess.on('error', (err) => {
+      reject(err);
     });
   });
 }
+
+runTrivyScan(scanDir, reportPath)
+  .then(() => {
+    console.log('Scan finished!');
+    // Continue with your report processing here...
+  })
+  .catch(err => {
+    console.error('Error during Trivy scan:', err);
+  });
 
 // Parse the Trivy JSON report
 function parseReport(reportPath) {
