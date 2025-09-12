@@ -106,6 +106,7 @@ function installTrivy() {
 //     });
 //   });
 // }
+
 async function runTrivyScan(scanDir, reportPath) {
   return new Promise((resolve, reject) => {
     const args = [
