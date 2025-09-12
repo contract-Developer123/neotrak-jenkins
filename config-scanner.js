@@ -118,15 +118,6 @@ async function runTrivyScan(scanDir, reportPath) {
   });
 }
 
-runTrivyScan(scanDir, reportPath)
-  .then(() => {
-    console.log('Scan finished!');
-    // Continue with your report processing here...
-  })
-  .catch(err => {
-    console.error('Error during Trivy scan:', err);
-  });
-
 // Parse the Trivy JSON report
 function parseReport(reportPath) {
   return new Promise((resolve, reject) => {
@@ -206,7 +197,7 @@ async function run() {
     }
 
     // Step 2: Run the Trivy scan
-    await runTrivyScan();
+    await runTrivyScan(scanDir, reportPath);
     console.log(`✅ Trivy scan completed. Report saved to: ${reportPath}`);
 
     // Step 3: Parse the Trivy JSON report
