@@ -29,7 +29,7 @@ async function runScans() {
 
     if (scanTypes.includes('sca')) {
       console.log('🧪 Running SCA scan...');
-      tasks.push(runScript('index.js'));
+      tasks.push(runScript('sbom.js'));
     }
 
     if (scanTypes.includes('configs') || scanTypes.includes('config')) {
