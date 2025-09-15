@@ -1,24 +1,29 @@
 const { spawn } = require('child_process');
+const path = require('path');
+
+// Always resolve paths relative to current script (even when called from root)
+const basePath = __dirname;
 
 const scanTypeRaw = process.env.SCAN_TYPE || '';
 const scanTypes = scanTypeRaw
   .split(',')
   .map(type => type.trim().toLowerCase());
 
-function runScript(scriptPath) {
+function runScript(scriptName) {
+  const fullPath = path.join(basePath, scriptName); // point to the correct location
   return new Promise((resolve, reject) => {
-    const proc = spawn('node', [scriptPath], { stdio: 'inherit' });
+    const proc = spawn('node', [fullPath], { stdio: 'inherit' });
 
     proc.on('close', (code) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`❌ ${scriptPath} exited with code ${code}`));
+        reject(new Error(`❌ ${scriptName} exited with code ${code}`));
       }
     });
 
     proc.on('error', (err) => {
-      reject(new Error(`❌ Failed to start ${scriptPath}: ${err.message}`));
+      reject(new Error(`❌ Failed to start ${scriptName}: ${err.message}`));
     });
   });
 }
@@ -42,7 +47,6 @@ async function runScans() {
       process.exit(0);
     }
 
-    // Run scans in sequence (await one after another)
     for (const task of tasks) {
       await task;
     }
