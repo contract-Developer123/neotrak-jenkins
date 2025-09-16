@@ -105,17 +105,31 @@ async function sendSecretsToApi(projectId, secretItems) {
   }
 }
 
+// Function to list all files in a directory and print them
+function listFilesInDir(scanDir) {
+  try {
+    const files = fs.readdirSync(scanDir);
+    console.log(`📂 Files in directory "${scanDir}":`);
+    files.forEach(file => {
+      console.log(file);
+    });
+  } catch (err) {
+    console.error(`❌ Error reading directory "${scanDir}":`, err.message || err);
+  }
+}
+
 // Main function to initiate the scan
 async function main() {
   try {
     const scanDir = process.env.SCAN_DIR || process.env.CI_PROJECT_DIR || process.cwd();; 
-    const repoName = (process.env.GITHUB_REPOSITORY || 'repo/unknown').split('/')[1];
+    // const repoName = (process.env.GITHUB_REPOSITORY || 'repo/unknown').split('/')[1];
     const reportPath = path.join(scanDir, `secrets_report_${Date.now()}_report.json`);
     const rulesPath = createTempRulesFile();
 
     console.log(`📂 Scanning directory: ${scanDir}`);
     log(`📝 Using custom inline rules from: ${rulesPath}`);
 
+    listFilesInDir(scanDir);
     // Set Git safe directory for Docker/Jenkins context
     try {
       execSync(`git config --global --add safe.directory "${scanDir}"`);
