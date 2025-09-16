@@ -16,14 +16,68 @@ function error(...args) {
 }
 
 const skipFiles = [
-    'package.json',
-    'package-lock.json',
-    'pom.xml',
-    'build.gradle',
-    'requirements.txt',
-    'README.md',
-    '.gitignore'
+  'package.json',
+  'package-lock.json',
+  'pom.xml',
+  'build.gradle',
+  'requirements.txt',
+  'README.md',
+  '.gitignore'
 ];
+
+// Function to check if Gitleaks is installed
+function isGitleaksInstalled() {
+  try {
+    execSync('gitleaks --version', { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Function to install Gitleaks if not installed
+function installGitleaks() {
+  return new Promise((resolve, reject) => {
+    console.log('Gitleaks is not installed. Installing...');
+
+    // Determine the platform and use the appropriate installation method
+    const platform = os.platform();
+    let installCommand;
+
+    if (platform === 'win32') {
+      installCommand = 'curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-windows-amd64.exe -o gitleaks.exe && move /Y gitleaks.exe C:\\Windows\\System32\\gitleaks.exe';
+    } else if (platform === 'darwin') {
+      installCommand = 'brew install gitleaks';
+    } else if (platform === 'linux') {
+      installCommand = 'curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64.tar.gz | tar xz -C /tmp && sudo mv /tmp/gitleaks /usr/local/bin';
+    } else {
+      return reject(new Error(`Unsupported platform: ${platform}`));
+    }
+
+    // Execute the install command
+    exec(installCommand, (error, stdout, stderr) => {
+      if (error) {
+        return reject(`❌ Error installing Gitleaks: ${stderr}`);
+      }
+      resolve(stdout || stderr);
+    });
+  });
+}
+
+// Function to install Gitleaks if necessary
+async function ensureGitleaksInstalled() {
+  if (!isGitleaksInstalled()) {
+    try {
+      await installGitleaks();
+      console.log('✅ Gitleaks installed successfully.');
+    } catch (err) {
+      console.error(`❌ Failed to install Gitleaks: ${err.message}`);
+      process.exit(1);
+    }
+  } else {
+    console.log('✅ Gitleaks is already installed.');
+  }
+}
 
 // Custom Rules for Gitleaks
 const customRules = `
@@ -211,6 +265,9 @@ async function main() {
     } catch (e) {
       warn("⚠️ Could not configure Git safe directory (not a git repo?)");
     }
+
+    // Ensure Gitleaks is installed
+    await ensureGitleaksInstalled();
 
     // Run the Gitleaks scan
     await runGitleaks(scanDir, reportPath, rulesPath);
