@@ -1,11 +1,10 @@
 const { exec, execSync } = require('child_process');
 const fs = require('fs');
-const path = require('path');
 const os = require('os');
+const path = require('path');
 const axios = require('axios');
 
 const debugMode = process.env.DEBUG_MODE === 'true';
-
 function log(...args) {
   if (debugMode) console.log(...args);
 }
@@ -16,29 +15,65 @@ function error(...args) {
   console.error(...args);
 }
 
-// Function to create temporary rule file for Gitleaks
-function createTempRulesFile() {
-  const customRules = `[[rules]]
+const skipFiles = [
+    'package.json',
+    'package-lock.json',
+    'pom.xml',
+    'build.gradle',
+    'requirements.txt',
+    'README.md',
+    '.gitignore'
+];
+
+// Custom Rules for Gitleaks
+const customRules = `
+[[rules]]
 id = "strict-secret-detection"
 description = "Detect likely passwords or secrets with high entropy"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
-tags = ["key", "secret", "generic", "password"]`;
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_!$%]{10,})["']'''
+tags = ["key", "secret", "generic", "password"]
 
+[[rules]]
+id = "aws-secret"
+description = "AWS Secret Access Key"
+regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
+tags = ["aws", "key", "secret"]
+
+[[rules]]
+id = "aws-key"
+description = "AWS Access Key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["aws", "key"]
+
+[[rules]]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[A-Za-z0-9_]{36}'''
+tags = ["github", "token"]
+
+[[rules]]
+id = "jwt"
+description = "JSON Web Token"
+regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
+tags = ["token", "jwt"]
+
+[[rules]]
+id = "firebase-api-key"
+description = "Firebase API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["firebase", "apikey"]
+`;
+
+// Create a temporary file for the Gitleaks rules
+function createTempRulesFile() {
   const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
   fs.writeFileSync(rulesPath, customRules);
   return rulesPath;
 }
 
-// Function to run Gitleaks with specific directories/files skipped
+// Run the Gitleaks command for secret scanning
 function runGitleaks(scanDir, reportPath, rulesPath) {
   return new Promise((resolve, reject) => {
-    // Check if the directory is 'neotrak-jenkins' and skip it
-    if (scanDir.includes('neotrak-jenkins')) {
-      console.log("❌ Skipping 'neotrak-jenkins' directory...");
-      resolve();  // Skip the scan for this directory
-      return;
-    }
-
     const command = `gitleaks detect --source=${scanDir} --report-path=${reportPath} --config=${rulesPath} --no-banner`;
     log(`🔍 Running Gitleaks:\n${command}`);
 
@@ -48,12 +83,17 @@ function runGitleaks(scanDir, reportPath, rulesPath) {
         warn('⚠️ Gitleaks STDERR:\n', stderr);
       }
 
+      if (error) {
+        reject(`❌ Error executing Gitleaks: ${stderr}`);
+        return;
+      }
+
       resolve();
     });
   });
 }
 
-// Function to check the generated report for secrets
+// Check the report for secrets
 function checkReport(reportPath) {
   return new Promise((resolve, reject) => {
     fs.readFile(reportPath, 'utf8', (err, data) => {
@@ -63,13 +103,46 @@ function checkReport(reportPath) {
         const report = JSON.parse(data);
         resolve(report.length ? report : "No secrets detected.");
       } catch (e) {
-        reject(new Error("Invalid JSON in gitleaks report."));
+        reject(new Error("Invalid JSON in Gitleaks report."));
       }
     });
   });
 }
 
-// Function to send secrets to external API
+// Map the secrets to the desired format
+function mapToSBOMSecret(item) {
+  const fixedFile = fixFilePath(item.File);
+  return {
+    RuleID: item.RuleID,
+    Description: item.Description,
+    File: fixedFile,
+    Match: item.Match,
+    Secret: item.Secret,
+    StartLine: String(item.StartLine ?? ''),
+    EndLine: String(item.EndLine ?? ''),
+    StartColumn: String(item.StartColumn ?? ''),
+    EndColumn: String(item.EndColumn ?? ''),
+  };
+}
+
+// Fix the file path for reporting
+function fixFilePath(filePath) {
+  if (!filePath) return '///////'; // 7 slashes = 8 empty segments
+
+  let segments = filePath.split('/');
+  const requiredSegments = 8;
+
+  // Count only actual segments; empty strings from leading/trailing slashes are valid
+  const nonEmptyCount = segments.filter(Boolean).length;
+
+  while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
+    segments.unshift('');
+  }
+
+  return segments.join('/');
+}
+
+// Send secrets to external API (e.g., SBOM system)
 async function sendSecretsToApi(projectId, secretItems) {
   const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${projectId}`;
   const secretsData = secretItems.map(mapToSBOMSecret);
@@ -105,7 +178,7 @@ async function sendSecretsToApi(projectId, secretItems) {
   }
 }
 
-// Function to list all files in a directory and print them
+// List files in the directory being scanned
 function listFilesInDir(scanDir) {
   try {
     const files = fs.readdirSync(scanDir);
@@ -121,27 +194,29 @@ function listFilesInDir(scanDir) {
 // Main function to initiate the scan
 async function main() {
   try {
-    const scanDir = process.env.SCAN_DIR || process.env.CI_PROJECT_DIR || process.cwd();; 
-    // const repoName = (process.env.GITHUB_REPOSITORY || 'repo/unknown').split('/')[1];
+    // Use Jenkins workspace as the scan directory
+    const scanDir = process.env.WORKSPACE || process.cwd();  // WORKSPACE is set in Jenkins
     const reportPath = path.join(scanDir, `secrets_report_${Date.now()}_report.json`);
     const rulesPath = createTempRulesFile();
 
     console.log(`📂 Scanning directory: ${scanDir}`);
     log(`📝 Using custom inline rules from: ${rulesPath}`);
 
+    // Print files in the scan directory (for debugging purposes)
     listFilesInDir(scanDir);
-    // Set Git safe directory for Docker/Jenkins context
+
+    // Set Git safe directory for Jenkins context
     try {
       execSync(`git config --global --add safe.directory "${scanDir}"`);
     } catch (e) {
       warn("⚠️ Could not configure Git safe directory (not a git repo?)");
     }
 
-    // Run the scan, skipping 'neotrak-jenkins' directory
+    // Run the Gitleaks scan
     await runGitleaks(scanDir, reportPath, rulesPath);
     const result = await checkReport(reportPath);
 
-    // Filter out files from the report (e.g., node_modules, files you want to ignore)
+    // Filter out files from the report (e.g., node_modules, files to ignore)
     const filtered = Array.isArray(result)
       ? result.filter(item =>
         !skipFiles.includes(path.basename(item.File)) &&
@@ -166,11 +241,12 @@ async function main() {
       process.exitCode = 1; // Fail the Jenkins build
     }
 
-    fs.unlinkSync(rulesPath);
+    fs.unlinkSync(rulesPath);  // Clean up the rules file
   } catch (err) {
     console.error("❌ Error during secret scan:", err.message || err);
     process.exit(1);
   }
 }
 
+// Start the scanning process
 main();
