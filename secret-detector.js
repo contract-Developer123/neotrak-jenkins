@@ -110,7 +110,7 @@ async function main() {
   try {
     const scanDir = process.env.SCAN_DIR || process.cwd();; 
     const repoName = (process.env.JOB_NAME || process.env.BUILD_TAG || 'repo/unknown').split('/')[1];
-    const reportPath = path.join(scanDir, `${repoName}_${process.env.BUILD_NUMBER}_report.json`);
+    const reportPath = path.join(scanDir, `${repoName}_${Date.now()}_report.json`);
     const rulesPath = createTempRulesFile();
 
     console.log(`📂 Scanning directory: ${scanDir}`);
