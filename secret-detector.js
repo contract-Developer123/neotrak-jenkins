@@ -108,9 +108,9 @@ async function sendSecretsToApi(projectId, secretItems) {
 // Main function to initiate the scan
 async function main() {
   try {
-    const scanDir = process.env.SCAN_DIR || process.cwd();; 
-    const repoName = (process.env.JOB_NAME || process.env.BUILD_TAG || 'repo/unknown').split('/')[1];
-    const reportPath = path.join(scanDir, `${repoName}_${Date.now()}_report.json`);
+    const scanDir = process.env.SCAN_DIR || process.env.CI_PROJECT_DIR || process.cwd();; 
+    const repoName = (process.env.GITHUB_REPOSITORY || 'repo/unknown').split('/')[1];
+    const reportPath = path.join(scanDir, `secrets_report_${Date.now()}_report.json`);
     const rulesPath = createTempRulesFile();
 
     console.log(`📂 Scanning directory: ${scanDir}`);
