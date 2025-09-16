@@ -42,6 +42,11 @@ async function runScans() {
       tasks.push(runScript('config-scanner.js'));
     }
 
+    if (scanTypes.includes('secrets') || scanTypes.includes('secret')) {
+      console.log('🧾 Running Secret scan...');
+      tasks.push(runScript('secret-detector.js'));
+    }
+
     if (tasks.length === 0) {
       console.log(`⚠️ No valid SCAN_TYPE found in "${scanTypeRaw}". Skipping scans.`);
       process.exit(0);

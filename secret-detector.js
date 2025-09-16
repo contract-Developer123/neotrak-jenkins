@@ -1,0 +1,221 @@
+const { exec, execSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const axios = require('axios');
+
+// Enable debugging if DEBUG_MODE is true in the environment
+const debugMode = process.env.DEBUG_MODE === 'true';
+function log(...args) {
+  if (debugMode) console.log(...args);
+}
+function warn(...args) {
+  if (debugMode) console.warn(...args);
+}
+function error(...args) {
+  console.error(...args);
+}
+
+// Define files to skip
+const skipFiles = [
+  'package.json',
+  'package-lock.json',
+  'pom.xml',
+  'build.gradle',
+  'requirements.txt',
+  'README.md',
+  '.gitignore'
+];
+
+// Custom regex rules for secret detection
+const customRules = `
+[[rules]]
+id = "strict-secret-detection"
+description = "Detect likely passwords or secrets with high entropy"
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
+tags = ["key", "secret", "generic", "password"]
+
+[[rules]]
+id = "aws-secret"
+description = "AWS Secret Access Key"
+regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
+tags = ["aws", "key", "secret"]
+
+[[rules]]
+id = "aws-key"
+description = "AWS Access Key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["aws", "key"]
+
+[[rules]]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[A-Za-z0-9_]{36}'''
+tags = ["github", "token"]
+
+[[rules]]
+id = "jwt"
+description = "JSON Web Token"
+regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
+tags = ["token", "jwt"]
+
+[[rules]]
+id = "firebase-api-key"
+description = "Firebase API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["firebase", "apikey"]
+`;
+
+function createTempRulesFile() {
+  const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
+  fs.writeFileSync(rulesPath, customRules);
+  return rulesPath;
+}
+
+function runGitleaks(scanDir, reportPath, rulesPath) {
+  return new Promise((resolve) => {
+    const command = `gitleaks detect --source=${scanDir} --report-path=${reportPath} --config=${rulesPath} --no-banner`;
+    log(`🔍 Running Gitleaks:\n${command}`);
+
+    exec(command, { shell: '/bin/bash' }, (error, stdout, stderr) => {
+      log('📤 Gitleaks STDOUT:\n', stdout);
+      if (stderr && stderr.trim()) {
+        warn('⚠️ Gitleaks STDERR:\n', stderr);
+      }
+
+      resolve();
+    });
+  });
+}
+
+function checkReport(reportPath) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(reportPath, 'utf8', (err, data) => {
+      if (err) return reject(err);
+
+      try {
+        const report = JSON.parse(data);
+        resolve(report.length ? report : "No secrets detected.");
+      } catch (e) {
+        reject(new Error("Invalid JSON in gitleaks report."));
+      }
+    });
+  });
+}
+
+function mapToSBOMSecret(item) {
+  const fixedFile = fixFilePath(item.File);
+  return {
+    RuleID: item.RuleID,
+    Description: item.Description,
+    File: fixedFile,
+    Match: item.Match,
+    Secret: item.Secret,
+    StartLine: String(item.StartLine ?? ''),
+    EndLine: String(item.EndLine ?? ''),
+    StartColumn: String(item.StartColumn ?? ''),
+    EndColumn: String(item.EndColumn ?? ''),
+  };
+}
+
+function fixFilePath(filePath) {
+  if (!filePath) return '///////';
+
+  let segments = filePath.split('/');
+  const requiredSegments = 8;
+
+  const nonEmptyCount = segments.filter(Boolean).length;
+
+  while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
+    segments.unshift('');
+  }
+
+  return segments.join('/');
+}
+
+async function sendSecretsToApi(projectId, secretItems) {
+  const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${projectId}`;
+  const secretsData = secretItems.map(mapToSBOMSecret);
+
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  const apiKey = process.env.X_API_KEY;
+  const secretKey = process.env.X_SECRET_KEY;
+  const tenantKey = process.env.X_TENANT_KEY;
+
+  if (apiKey) headers['x-api-key'] = apiKey;
+  if (secretKey) headers['x-secret-key'] = secretKey;
+  if (tenantKey) headers['x-tenant-key'] = tenantKey;
+
+  try {
+    log('Sending secrets:', JSON.stringify(secretsData, null, 2));
+
+    const response = await axios.post(apiUrl, secretsData, {
+      headers,
+      timeout: 60000,
+    });
+
+    if (response.status >= 200 && response.status < 300) {
+      log('✅ Secrets updated successfully in SBOM API.');
+    } else {
+      error(`❌ Failed to update secrets. Status: ${response.status}`);
+      error('Response body:', response.data);
+    }
+  } catch (err) {
+    error('❌ Error sending secrets to SBOM API:', err.message || err);
+  }
+}
+
+(async function () {
+  try {
+    // Use Jenkins environment variables
+    const scanDir = process.env.WORKSPACE || '/workspace'; 
+    const repoName = (process.env.JOB_NAME || 'repo/unknown').split('/')[1];
+    const reportPath = path.join(scanDir, `${repoName}_${process.env.BUILD_NUMBER}_report.json`);
+    const rulesPath = createTempRulesFile();
+
+    console.log(`📂 Scanning directory: ${scanDir}`);
+    log(`📝 Using custom inline rules from: ${rulesPath}`);
+
+    // Set Git safe directory for Docker/Jenkins context
+    try {
+      execSync(`git config --global --add safe.directory "${scanDir}"`);
+    } catch (e) {
+      warn("⚠️ Could not configure Git safe directory (not a git repo?)");
+    }
+
+    await runGitleaks(scanDir, reportPath, rulesPath);
+    const result = await checkReport(reportPath);
+
+    const filtered = Array.isArray(result)
+      ? result.filter(item =>
+        !skipFiles.includes(path.basename(item.File)) &&
+        !item.File.includes('node_modules') &&
+        !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
+      )
+      : result;
+
+    if (filtered === "No secrets detected." || (Array.isArray(filtered) && filtered.length === 0)) {
+      console.log("✅ No secrets detected.");
+    } else {
+      console.log("🔐 Detected secrets:");
+      console.dir(filtered, { depth: null, colors: true });
+
+      const projectId = process.env.PROJECT_ID;
+      if (!projectId) {
+        console.error("❌ PROJECT_ID environment variable not set.");
+        process.exit(1);
+      }
+
+      await sendSecretsToApi(projectId, filtered);
+      process.exitCode = 1; // Fail the Jenkins build
+    }
+
+    fs.unlinkSync(rulesPath);
+  } catch (err) {
+    console.error("❌ Error during secret scan:", err.message || err);
+    process.exit(1);
+  }
+})();
