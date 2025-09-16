@@ -1,162 +1,233 @@
-const { exec, execSync } = require('child_process');
+const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const axios = require('axios');
 
-const debugMode = process.env.DEBUG_MODE === 'true';
-
-function log(...args) {
-  if (debugMode) console.log(...args);
-}
-function warn(...args) {
-  if (debugMode) console.warn(...args);
-}
-function error(...args) {
-  console.error(...args);
-}
-
-// Function to create temporary rule file for Gitleaks
-function createTempRulesFile() {
-  const customRules = `[[rules]]
-id = "strict-secret-detection"
-description = "Detect likely passwords or secrets with high entropy"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
-tags = ["key", "secret", "generic", "password"]`;
-
-  const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
-  fs.writeFileSync(rulesPath, customRules);
-  return rulesPath;
-}
-
-// Function to run Gitleaks with specific directories/files skipped
-function runGitleaks(scanDir, reportPath, rulesPath) {
-  return new Promise((resolve, reject) => {
-    // Check if the directory is 'neotrak-jenkins' and skip it
-    if (scanDir.includes('neotrak-jenkins')) {
-      console.log("❌ Skipping 'neotrak-jenkins' directory...");
-      resolve();  // Skip the scan for this directory
-      return;
+// Ensure 'axios' is installed
+function ensureDependencyInstalled(packageName) {
+  try {
+    require.resolve(packageName);
+  } catch (e) {
+    console.warn(`📦 '${packageName}' not found. Installing...`);
+    try {
+      execSync(`npm install ${packageName}`, { stdio: 'inherit' });
+      console.log(`✅ '${packageName}' installed successfully.`);
+    } catch (installErr) {
+      console.error(`❌ Failed to install '${packageName}':`, installErr);
+      process.exit(1);
     }
+  }
+}
 
-    const command = `gitleaks detect --source=${scanDir} --report-path=${reportPath} --config=${rulesPath} --no-banner`;
-    log(`🔍 Running Gitleaks:\n${command}`);
+ensureDependencyInstalled('axios');
 
-    exec(command, { shell: '/bin/bash' }, (error, stdout, stderr) => {
-      log('📤 Gitleaks STDOUT:\n', stdout);
-      if (stderr && stderr.trim()) {
-        warn('⚠️ Gitleaks STDERR:\n', stderr);
+// Configurations and environment variables
+const apiKey = process.env.X_API_KEY;
+const secretKey = process.env.X_SECRET_KEY;
+const tenantKey = process.env.X_TENANT_KEY;
+const projectId = process.env.PROJECT_ID;
+const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-configs/${projectId}`;
+
+const scanDir = process.env.SCAN_DIR || process.cwd(); // Default to current working directory
+const repoName = (process.env.JOB_NAME || process.env.BUILD_TAG || 'repo/unknown').split('/')[1];
+const buildNumber = process.env.BUILD_NUMBER || 'unknown';
+const reportPath = path.join(scanDir, `${repoName}_${buildNumber}_secret_report.json`);
+
+// Function to check if Trivy is installed
+function checkTrivyInstalled() {
+  return new Promise((resolve, reject) => {
+    const command = os.platform() === 'win32' ? 'where trivy' : 'which trivy';
+    exec(command, (error, stdout, stderr) => {
+      if (error || stderr) {
+        reject(new Error("❌ Trivy is not installed or not found in PATH."));
+      } else {
+        resolve(stdout);
       }
-
-      resolve();
     });
   });
 }
 
-// Function to check the generated report for secrets
-function checkReport(reportPath) {
+// Function to install Trivy (based on OS)
+function installTrivy() {
   return new Promise((resolve, reject) => {
-    fs.readFile(reportPath, 'utf8', (err, data) => {
+    const isWindows = os.platform() === 'win32';
+    let installCommand = '';
+
+    if (isWindows) {
+      // Windows installation using Chocolatey or winget
+      installCommand = 'choco install trivy -y';
+      console.log('🔄 Installing Trivy on Windows...');
+    } else if (os.platform() === 'linux') {
+      // Linux installation (Debian/Ubuntu)
+      installCommand = 'sudo apt-get install -y wget && wget https://github.com/aquasecurity/trivy/releases/download/v0.34.0/trivy_0.34.0_Linux-64bit.deb && sudo dpkg -i trivy_0.34.0_Linux-64bit.deb';
+      console.log('🔄 Installing Trivy on Linux...');
+    } else if (os.platform() === 'darwin') {
+      // macOS installation using Homebrew
+      installCommand = 'brew install aquasecurity/trivy/trivy';
+      console.log('🔄 Installing Trivy on macOS...');
+    } else {
+      reject(new Error('❌ Unsupported OS for automatic Trivy installation.'));
+      return;
+    }
+
+    exec(installCommand, (error, stdout, stderr) => {
+      if (error || stderr) {
+        reject(new Error(`❌ Failed to install Trivy: ${stderr || error.message}`));
+      } else {
+        console.log(`✅ Trivy installed successfully. Output: ${stdout}`);
+        resolve();
+      }
+    });
+  });
+}
+
+// Function to skip specific directories
+function skipScanDirectory(directory) {
+  if (directory.includes('neotrak-jenkins')) {
+    console.log("❌ Skipping 'neotrak-jenkins' directory...");
+    return true;
+  }
+  return false;
+}
+
+// Function to run Trivy scan
+async function runTrivyScan(scanDir, reportPath) {
+  return new Promise((resolve, reject) => {
+    if (skipScanDirectory(scanDir)) {
+      resolve(); // Skip the scan
+      return;
+    }
+
+    const args = [
+      'config',
+      '--severity', 'LOW,MEDIUM,HIGH,CRITICAL',
+      '--skip-dirs', 'neotrak-jenkins,node_modules,.git,build',
+      '--format', 'json',
+      '--output', reportPath,
+      scanDir
+    ];
+
+    console.log(`🔍 Running Trivy scan on directory: ${scanDir}`);
+    console.log(`Executing command: trivy ${args.join(' ')}`);
+
+    const trivyProcess = spawn('trivy', args);
+
+    trivyProcess.stdout.on('data', (data) => {
+      process.stdout.write(`STDOUT: ${data}`);
+    });
+
+    trivyProcess.stderr.on('data', (data) => {
+      process.stderr.write(`STDERR: ${data}`);
+    });
+
+    trivyProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log('✅ Trivy scan completed successfully.');
+        resolve();
+      } else {
+        reject(new Error(`❌ Trivy scan failed with exit code ${code}`));
+      }
+    });
+
+    trivyProcess.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+// Function to parse Trivy report and send it to the API
+function parseAndSendReport(reportPath) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(reportPath, 'utf8', async (err, data) => {
       if (err) return reject(err);
 
       try {
         const report = JSON.parse(data);
-        resolve(report.length ? report : "No secrets detected.");
+        const results = Array.isArray(report.Results) ? report.Results : [];
+
+        const structuredReport = {
+          ArtifactName: report.ArtifactName || 'unknown-artifact',
+          ArtifactType: report.ArtifactType || 'config',
+          Results: results.map(result => ({
+            Target: result.Target,
+            Class: result.Class,
+            Type: result.Type,
+            Misconfigurations: (result.Misconfigurations || []).map(m => ({
+              ID: m.ID,
+              Title: m.Title,
+              Description: m.Description,
+              Severity: m.Severity,
+              PrimaryURL: m.PrimaryURL,
+              Query: m.Query
+            }))
+          }))
+        };
+
+        // Send the parsed report to the API
+        await sendToAPI(structuredReport);
+        resolve();
       } catch (e) {
-        reject(new Error("Invalid JSON in gitleaks report."));
+        reject(new Error(`❌ Failed to parse Trivy report JSON: ${e.message}`));
       }
     });
   });
 }
 
-// Function to send secrets to external API
-async function sendSecretsToApi(projectId, secretItems) {
-  const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${projectId}`;
-  const secretsData = secretItems.map(mapToSBOMSecret);
+// Function to send the parsed report to the API
+async function sendToAPI(payload) {
+  if (!apiKey || !secretKey || !tenantKey || !projectId) {
+    console.error("❌ Missing API credentials or project ID.");
+    return;
+  }
 
   const headers = {
     'Content-Type': 'application/json',
+    'X-API-KEY': apiKey,
+    'X-SECRET-KEY': secretKey,
+    'X-TENANT-KEY': tenantKey,
   };
 
-  const apiKey = process.env.X_API_KEY;
-  const secretKey = process.env.X_SECRET_KEY;
-  const tenantKey = process.env.X_TENANT_KEY;
-
-  if (apiKey) headers['x-api-key'] = apiKey;
-  if (secretKey) headers['x-secret-key'] = secretKey;
-  if (tenantKey) headers['x-tenant-key'] = tenantKey;
-
   try {
-    log('Sending secrets:', JSON.stringify(secretsData, null, 2));
-
-    const response = await axios.post(apiUrl, secretsData, {
-      headers,
-      timeout: 60000,
-    });
-
-    if (response.status >= 200 && response.status < 300) {
-      log('✅ Secrets updated successfully in SBOM API.');
+    const response = await axios.post(apiUrl, payload, { headers });
+    console.log(`✅ Config report successfully sent. Status: ${response.status}`);
+  } catch (error) {
+    if (error.response) {
+      console.error('❌ API responded with an error:', error.response.status, error.response.statusText);
+      console.error('Response data:', error.response.data);
+    } else if (error.request) {
+      console.error('❌ No response received from API. Request details:', error.request);
     } else {
-      error(`❌ Failed to update secrets. Status: ${response.status}`);
-      error('Response body:', response.data);
+      console.error('❌ Error setting up API request:', error.message);
     }
-  } catch (err) {
-    error('❌ Error sending secrets to SBOM API:', err.message || err);
-  }
-}
-
-// Main function to initiate the scan
-async function main() {
-  try {
-    const scanDir = process.env.WORKSPACE || '/workspace'; 
-    const repoName = (process.env.JOB_NAME || process.env.BUILD_TAG || 'repo/unknown').split('/')[1];
-    const reportPath = path.join(scanDir, `${repoName}_${process.env.BUILD_NUMBER}_report.json`);
-    const rulesPath = createTempRulesFile();
-
-    console.log(`📂 Scanning directory: ${scanDir}`);
-    log(`📝 Using custom inline rules from: ${rulesPath}`);
-
-    // Set Git safe directory for Docker/Jenkins context
-    try {
-      execSync(`git config --global --add safe.directory "${scanDir}"`);
-    } catch (e) {
-      warn("⚠️ Could not configure Git safe directory (not a git repo?)");
-    }
-
-    // Run the scan, skipping 'neotrak-jenkins' directory
-    await runGitleaks(scanDir, reportPath, rulesPath);
-    const result = await checkReport(reportPath);
-
-    // Filter out files from the report (e.g., node_modules, files you want to ignore)
-    const filtered = Array.isArray(result)
-      ? result.filter(item =>
-        !skipFiles.includes(path.basename(item.File)) &&
-        !item.File.includes('node_modules') &&
-        !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
-      )
-      : result;
-
-    if (filtered === "No secrets detected." || (Array.isArray(filtered) && filtered.length === 0)) {
-      console.log("✅ No secrets detected.");
-    } else {
-      console.log("🔐 Detected secrets:");
-      console.dir(filtered, { depth: null, colors: true });
-
-      const projectId = process.env.PROJECT_ID;
-      if (!projectId) {
-        console.error("❌ PROJECT_ID environment variable not set.");
-        process.exit(1);
-      }
-
-      await sendSecretsToApi(projectId, filtered);
-      process.exitCode = 1; // Fail the Jenkins build
-    }
-
-    fs.unlinkSync(rulesPath);
-  } catch (err) {
-    console.error("❌ Error during secret scan:", err.message || err);
     process.exit(1);
   }
 }
 
-main();
+// Main function to execute the entire process
+async function run() {
+  try {
+    // Step 1: Check if Trivy is installed
+    try {
+      await checkTrivyInstalled();
+      console.log('✅ Trivy is already installed.');
+    } catch (e) {
+      console.log('❌ Trivy not found.');
+      await installTrivy();  // Install Trivy if not found
+    }
+
+    // Step 2: Run the Trivy scan
+    await runTrivyScan(scanDir, reportPath);
+    console.log(`✅ Trivy scan completed. Report saved to: ${reportPath}`);
+
+    // Step 3: Parse and send the report
+    await parseAndSendReport(reportPath);
+    console.log('✅ Report successfully sent to the API.');
+  } catch (error) {
+    console.error(`❌ Error during process: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+// Execute the main function
+run();
