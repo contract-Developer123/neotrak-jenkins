@@ -1,11 +1,11 @@
 const { exec, execSync } = require('child_process');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+const os = require('os');
 const axios = require('axios');
 
-// Enable debugging if DEBUG_MODE is true in the environment
 const debugMode = process.env.DEBUG_MODE === 'true';
+
 function log(...args) {
   if (debugMode) console.log(...args);
 }
@@ -16,64 +16,29 @@ function error(...args) {
   console.error(...args);
 }
 
-// Define files to skip
-const skipFiles = [
-  'package.json',
-  'package-lock.json',
-  'pom.xml',
-  'build.gradle',
-  'requirements.txt',
-  'README.md',
-  '.gitignore'
-];
-
-// Custom regex rules for secret detection
-const customRules = `
-[[rules]]
+// Function to create temporary rule file for Gitleaks
+function createTempRulesFile() {
+  const customRules = `[[rules]]
 id = "strict-secret-detection"
 description = "Detect likely passwords or secrets with high entropy"
 regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
-tags = ["key", "secret", "generic", "password"]
+tags = ["key", "secret", "generic", "password"]`;
 
-[[rules]]
-id = "aws-secret"
-description = "AWS Secret Access Key"
-regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
-tags = ["aws", "key", "secret"]
-
-[[rules]]
-id = "aws-key"
-description = "AWS Access Key ID"
-regex = '''AKIA[0-9A-Z]{16}'''
-tags = ["aws", "key"]
-
-[[rules]]
-id = "github-token"
-description = "GitHub Personal Access Token"
-regex = '''ghp_[A-Za-z0-9_]{36}'''
-tags = ["github", "token"]
-
-[[rules]]
-id = "jwt"
-description = "JSON Web Token"
-regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
-tags = ["token", "jwt"]
-
-[[rules]]
-id = "firebase-api-key"
-description = "Firebase API Key"
-regex = '''AIza[0-9A-Za-z\\-_]{35}'''
-tags = ["firebase", "apikey"]
-`;
-
-function createTempRulesFile() {
   const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
   fs.writeFileSync(rulesPath, customRules);
   return rulesPath;
 }
 
+// Function to run Gitleaks with specific directories/files skipped
 function runGitleaks(scanDir, reportPath, rulesPath) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    // Check if the directory is 'neotrak-jenkins' and skip it
+    if (scanDir.includes('neotrak-jenkins')) {
+      console.log("❌ Skipping 'neotrak-jenkins' directory...");
+      resolve();  // Skip the scan for this directory
+      return;
+    }
+
     const command = `gitleaks detect --source=${scanDir} --report-path=${reportPath} --config=${rulesPath} --no-banner`;
     log(`🔍 Running Gitleaks:\n${command}`);
 
@@ -88,6 +53,7 @@ function runGitleaks(scanDir, reportPath, rulesPath) {
   });
 }
 
+// Function to check the generated report for secrets
 function checkReport(reportPath) {
   return new Promise((resolve, reject) => {
     fs.readFile(reportPath, 'utf8', (err, data) => {
@@ -103,36 +69,7 @@ function checkReport(reportPath) {
   });
 }
 
-function mapToSBOMSecret(item) {
-  const fixedFile = fixFilePath(item.File);
-  return {
-    RuleID: item.RuleID,
-    Description: item.Description,
-    File: fixedFile,
-    Match: item.Match,
-    Secret: item.Secret,
-    StartLine: String(item.StartLine ?? ''),
-    EndLine: String(item.EndLine ?? ''),
-    StartColumn: String(item.StartColumn ?? ''),
-    EndColumn: String(item.EndColumn ?? ''),
-  };
-}
-
-function fixFilePath(filePath) {
-  if (!filePath) return '///////';
-
-  let segments = filePath.split('/');
-  const requiredSegments = 8;
-
-  const nonEmptyCount = segments.filter(Boolean).length;
-
-  while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
-    segments.unshift('');
-  }
-
-  return segments.join('/');
-}
-
+// Function to send secrets to external API
 async function sendSecretsToApi(projectId, secretItems) {
   const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${projectId}`;
   const secretsData = secretItems.map(mapToSBOMSecret);
@@ -168,11 +105,11 @@ async function sendSecretsToApi(projectId, secretItems) {
   }
 }
 
-(async function () {
+// Main function to initiate the scan
+async function main() {
   try {
-    // Use Jenkins environment variables
     const scanDir = process.env.WORKSPACE || '/workspace'; 
-    const repoName = (process.env.JOB_NAME || 'repo/unknown').split('/')[1];
+    const repoName = (process.env.JOB_NAME || process.env.BUILD_TAG || 'repo/unknown').split('/')[1];
     const reportPath = path.join(scanDir, `${repoName}_${process.env.BUILD_NUMBER}_report.json`);
     const rulesPath = createTempRulesFile();
 
@@ -186,9 +123,11 @@ async function sendSecretsToApi(projectId, secretItems) {
       warn("⚠️ Could not configure Git safe directory (not a git repo?)");
     }
 
+    // Run the scan, skipping 'neotrak-jenkins' directory
     await runGitleaks(scanDir, reportPath, rulesPath);
     const result = await checkReport(reportPath);
 
+    // Filter out files from the report (e.g., node_modules, files you want to ignore)
     const filtered = Array.isArray(result)
       ? result.filter(item =>
         !skipFiles.includes(path.basename(item.File)) &&
@@ -218,4 +157,6 @@ async function sendSecretsToApi(projectId, secretItems) {
     console.error("❌ Error during secret scan:", err.message || err);
     process.exit(1);
   }
-})();
+}
+
+main();
