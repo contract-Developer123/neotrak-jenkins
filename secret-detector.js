@@ -30,7 +30,16 @@ function checkGitleaksInstalled() {
   return new Promise((resolve, reject) => {
     const command = 'where gitleaks';
     exec(command, { shell: true }, (error, stdout, stderr) => {
-      if (error || stderr) {
+      if (!error && stdout) {
+        const gitleaksPath = stdout.trim().split('\n')[0];
+        try {
+          const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+          console.log(`✅ Gitleaks found in PATH: ${gitleaksPath}. Version: ${version}`);
+          resolve(gitleaksPath);
+        } catch (err) {
+          reject(new Error(`❌ Gitleaks found in PATH but not executable: ${err.message}`));
+        }
+      } else {
         // Check fallback location in SYSTEM user's home directory
         const gitleaksPath = path.join(os.homedir(), 'gitleaks', 'gitleaks.exe');
         if (fs.existsSync(gitleaksPath)) {
@@ -44,15 +53,6 @@ function checkGitleaksInstalled() {
         } else {
           reject(new Error("❌ Gitleaks is not installed or not found in PATH."));
         }
-      } else {
-        const gitleaksPath = stdout.trim().split('\n')[0];
-        try {
-          const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-          console.log(`✅ Gitleaks found in PATH: ${gitleaksPath}. Version: ${version}`);
-          resolve(gitleaksPath);
-        } catch (err) {
-          reject(new Error(`❌ Gitleaks found in PATH but not executable: ${err.message}`));
-        }
       }
     });
   });
@@ -65,15 +65,16 @@ function installGitleaks() {
     // Check if Chocolatey is available
     exec('choco --version', { shell: true }, (error, stdout, stderr) => {
       let installCommand;
+      let expectedPath;
       if (!error && stdout) {
         console.log('🔄 Installing Gitleaks using Chocolatey...');
-        // Force reinstall to ensure a clean installation
         installCommand = 'choco install gitleaks -y --force';
+        expectedPath = 'gitleaks'; // Use shim in PATH
       } else {
         console.log('🔄 Chocolatey not found. Installing Gitleaks manually...');
         const installDir = path.join(os.homedir(), 'gitleaks');
-        const gitleaksPath = path.join(installDir, 'gitleaks.exe');
-        installCommand = `mkdir "${installDir}" & curl -L -o "${gitleaksPath}" https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-windows-amd64.exe`;
+        expectedPath = path.join(installDir, 'gitleaks.exe');
+        installCommand = `mkdir "${installDir}" & curl -L -o "${expectedPath}" https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-windows-amd64.exe`;
       }
 
       exec(installCommand, { shell: true }, (error, stdout, stderr) => {
@@ -83,13 +84,10 @@ function installGitleaks() {
         }
         console.log(`✅ Gitleaks installed successfully. Output: ${stdout}`);
         // Verify installation
-        const gitleaksPath = !error && stdout.includes('choco') 
-          ? 'gitleaks' // Use PATH for Chocolatey install
-          : path.join(os.homedir(), 'gitleaks', 'gitleaks.exe');
         try {
-          const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+          const version = execSync(`"${expectedPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
           console.log(`Gitleaks version: ${version}`);
-          resolve(gitleaksPath);
+          resolve(expectedPath);
         } catch (err) {
           reject(new Error(`❌ Gitleaks installed but not executable: ${err.message}`));
         }
