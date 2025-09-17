@@ -21,8 +21,7 @@ const skipFiles = [
   'build.gradle',
   'requirements.txt',
   'README.md',
-  '.gitignore',
-  'jenkinsfile'
+  '.gitignore'
 ];
 
 // Function to check if Gitleaks is installed
@@ -71,10 +70,10 @@ function checkGitleaksInstalled() {
   });
 }
 
-// Function to run Gitleaks to detect credentials
+// Function to run Gitleaks to detect credentials (ensure output is in JSON format)
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose`;
+    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --format=json`;
     log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
@@ -158,8 +157,10 @@ async function main() {
 
     if (secretsDetected > 0) {
       console.log("🔐 Detected secrets details:");
-      const formattedSecrets = result.map(item => mapToSecretFormat(item));
-      console.dir(formattedSecrets, { depth: null, colors: true });
+      result.forEach(item => {
+        const formattedSecret = mapToSecretFormat(item);
+        console.log(formattedSecret);
+      });
     }
 
     // Optionally, process the secrets to exclude certain files
@@ -173,8 +174,10 @@ async function main() {
 
     if (filteredSecrets.length > 0) {
       console.log("🔐 Filtered credentials detected:");
-      const formattedFilteredSecrets = filteredSecrets.map(item => mapToSecretFormat(item));
-      console.dir(formattedFilteredSecrets, { depth: null, colors: true });
+      filteredSecrets.forEach(item => {
+        const formattedFilteredSecret = mapToSecretFormat(item);
+        console.log(formattedFilteredSecret);
+      });
     } else {
       console.log("✅ No credentials after filtering.");
     }
