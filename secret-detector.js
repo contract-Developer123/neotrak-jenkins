@@ -70,14 +70,33 @@ function checkGitleaksInstalled() {
   });
 }
 
-// Function to run Gitleaks to detect credentials (ensure output is in JSON format)
+// Function to run Gitleaks to detect credentials and print the files it's scanning
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
     const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json`;
     log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
-      log('📤 Gitleaks STDOUT:\n', stdout);
+      log('📤 Gitleaks STDOUT:\n', stdout); // This will print detailed output, including which files are being scanned.
+      
+      // Capture file names from the output and log them
+      if (stdout) {
+        const fileScanningRegex = /Scanning file: (.+)/g;
+        let match;
+        const scannedFiles = [];
+        
+        while ((match = fileScanningRegex.exec(stdout)) !== null) {
+          scannedFiles.push(match[1]);
+        }
+        
+        if (scannedFiles.length > 0) {
+          console.log("🔍 Files being scanned for secrets:");
+          scannedFiles.forEach(file => {
+            console.log(`- ${file}`);
+          });
+        }
+      }
+
       if (stderr && stderr.trim()) {
         warn('⚠️ Gitleaks STDERR:\n', stderr);
       }
@@ -91,6 +110,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
   });
 }
+
 
 // Function to check the Gitleaks report for credentials
 function checkReport(reportPath) {
