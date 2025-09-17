@@ -21,7 +21,8 @@ const skipFiles = [
   'build.gradle',
   'requirements.txt',
   'README.md',
-  '.gitignore'
+  '.gitignore',
+  'jenkinsfile'
 ];
 
 // Function to check if Gitleaks is installed
