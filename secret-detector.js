@@ -3,16 +3,16 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const debugMode = process.env.DEBUG_MODE === 'true';
-function log(...args) {
-  if (debugMode) console.log(...args);
-}
-function warn(...args) {
-  if (debugMode) console.warn(...args);
-}
-function error(...args) {
-  console.error(...args);
-}
+// const debugMode = process.env.DEBUG_MODE === 'true';
+// function log(...args) {
+//   if (debugMode) console.log(...args);
+// }
+// function warn(...args) {
+//   if (debugMode) console.warn(...args);
+// }
+// function error(...args) {
+//   console.error(...args);
+// }
 
 const skipFiles = [
   'package.json',
