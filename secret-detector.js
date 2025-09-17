@@ -108,9 +108,14 @@ function checkReport(reportPath) {
   });
 }
 
-// Function to map leak details for printing
-function mapToLeakDetails(item) {
-  const fixedFile = path.normalize(item.File);
+// Function to fix file paths (if necessary, depending on your system)
+function fixFilePath(filePath) {
+  return path.normalize(filePath);
+}
+
+// Function to map secret information to the desired structure
+function mapToSecretFormat(item) {
+  const fixedFile = fixFilePath(item.File);
   return {
     RuleID: item.RuleID,
     Description: item.Description,
@@ -149,13 +154,11 @@ async function main() {
     // Count the secrets found and print the number of secrets detected
     const secretsDetected = Array.isArray(result) ? result.length : 0;
     console.log(`🔐 Total secrets detected: ${secretsDetected}`);
+
     if (secretsDetected > 0) {
       console.log("🔐 Detected secrets details:");
-      result.forEach((item, idx) => {
-        const leakDetails = mapToLeakDetails(item);
-        console.log(`\nLeak #${idx + 1}:`);
-        console.dir(leakDetails, { depth: null, colors: true });
-      });
+      const formattedSecrets = result.map(item => mapToSecretFormat(item));
+      console.dir(formattedSecrets, { depth: null, colors: true });
     }
 
     // Optionally, process the secrets to exclude certain files
@@ -169,11 +172,8 @@ async function main() {
 
     if (filteredSecrets.length > 0) {
       console.log("🔐 Filtered credentials detected:");
-      filteredSecrets.forEach((item, idx) => {
-        const leakDetails = mapToLeakDetails(item);
-        console.log(`\nFiltered Leak #${idx + 1}:`);
-        console.dir(leakDetails, { depth: null, colors: true });
-      });
+      const formattedFilteredSecrets = filteredSecrets.map(item => mapToSecretFormat(item));
+      console.dir(formattedFilteredSecrets, { depth: null, colors: true });
     } else {
       console.log("✅ No credentials after filtering.");
     }
