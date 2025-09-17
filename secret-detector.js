@@ -130,7 +130,7 @@ function runGitleaks(scanDir, reportPath, rulesPath) {
     const command = `gitleaks detect --source=${scanDir} --report-path=${reportPath} --config=${rulesPath} --no-banner --verbose`;
     log(`🔍 Running Gitleaks:\n${command}`);
 
-    exec(command, { shell: '/bin/bash' }, (error, stdout, stderr) => {
+    exec(command, { shell: true }, (error, stdout, stderr) => {
       log('📤 Gitleaks STDOUT:\n', stdout);
       if (stderr && stderr.trim()) {
         warn('⚠️ Gitleaks STDERR:\n', stderr);
