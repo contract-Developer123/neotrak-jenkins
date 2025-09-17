@@ -7,14 +7,26 @@ const debugMode = process.env.DEBUG_MODE === 'true';
 function log(...args) {
   if (debugMode) console.log(...args);
 }
+function warn(...args) {
+  if (debugMode) console.warn(...args);
+}
 function error(...args) {
   console.error(...args);
 }
 
-// Function to check if Gitleaks is installed and get its version
+const skipFiles = [
+  'package.json',
+  'package-lock.json',
+  'pom.xml',
+  'build.gradle',
+  'requirements.txt',
+  'README.md',
+  '.gitignore'
+];
+
+// Function to check if Gitleaks is installed
 function checkGitleaksInstalled() {
   return new Promise((resolve, reject) => {
-    // Check for stale gitleaks.exe in C:\Windows\System32
     const system32Path = 'C:\\Windows\\System32\\gitleaks.exe';
     if (fs.existsSync(system32Path)) {
       try {
@@ -94,16 +106,16 @@ function installGitleaks() {
   });
 }
 
-// Main function to check or install Gitleaks
-async function main() {
+// Function to ensure Gitleaks is installed
+async function ensureGitleaksInstalled() {
   try {
-    await checkGitleaksInstalled();
-    console.log('✅ Gitleaks is ready for use.');
+    const gitleaksPath = await checkGitleaksInstalled();
+    return gitleaksPath;
   } catch (err) {
     console.log('Gitleaks not found. Attempting to install...');
     try {
-      await installGitleaks();
-      console.log('✅ Gitleaks installed and verified.');
+      const gitleaksPath = await installGitleaks();
+      return gitleaksPath;
     } catch (installErr) {
       error(`❌ Failed to install Gitleaks: ${installErr.message}`);
       process.exit(1);
@@ -111,7 +123,154 @@ async function main() {
   }
 }
 
-// Start the process
+// Custom Gitleaks rules for credential detection
+const customRules = `
+[[rules]]
+id = "strict-secret-detection"
+description = "Detect likely passwords or secrets with high entropy"
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_!$%]{10,})["']'''
+tags = ["key", "secret", "generic", "password"]
+
+[[rules]]
+id = "aws-secret"
+description = "AWS Secret Access Key"
+regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
+tags = ["aws", "key", "secret"]
+
+[[rules]]
+id = "aws-key"
+description = "AWS Access Key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["aws", "key"]
+
+[[rules]]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[A-Za-z0-9_]{36}'''
+tags = ["github", "token"]
+
+[[rules]]
+id = "jwt"
+description = "JSON Web Token"
+regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
+tags = ["token", "jwt"]
+
+[[rules]]
+id = "firebase-api-key"
+description = "Firebase API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["firebase", "apikey"]
+`;
+
+// Create a temporary file for Gitleaks rules
+function createTempRulesFile() {
+  const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
+  fs.writeFileSync(rulesPath, customRules);
+  return rulesPath;
+}
+
+// Run Gitleaks to detect credentials
+function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
+  return new Promise((resolve, reject) => {
+    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose`;
+    log(`🔍 Running Gitleaks:\n${command}`);
+
+    exec(command, { shell: true }, (error, stdout, stderr) => {
+      log('📤 Gitleaks STDOUT:\n', stdout);
+      if (stderr && stderr.trim()) {
+        warn('⚠️ Gitleaks STDERR:\n', stderr);
+      }
+
+      if (error) {
+        reject(`❌ Error executing Gitleaks: ${stderr}`);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+// Check the Gitleaks report for credentials
+function checkReport(reportPath) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(reportPath, 'utf8', (err, data) => {
+      if (err) return reject(err);
+
+      try {
+        const report = JSON.parse(data);
+        resolve(report.length ? report : "No credentials detected.");
+      } catch (e) {
+        reject(new Error("Invalid JSON in Gitleaks report."));
+      }
+    });
+  });
+}
+
+// List files in the directory being scanned
+function listFilesInDir(scanDir) {
+  try {
+    const files = fs.readdirSync(scanDir);
+    console.log(`📂 Files in directory "${scanDir}":`);
+    files.forEach(file => {
+      console.log(file);
+    });
+    return files;
+  } catch (err) {
+    console.error(`❌ Error reading directory "${scanDir}":`, err.message || err);
+    return [];
+  }
+}
+
+// Main function to detect credentials
+async function main() {
+  console.log('🧾 Detecting credentials in folder...');
+  try {
+    const scanDir = path.join(process.env.WORKSPACE || process.cwd(), 'neotrak-jenkins');
+    const reportPath = path.join(scanDir, `credentials_report_${Date.now()}.json`);
+    const rulesPath = createTempRulesFile();
+
+    console.log(`📂 Scanning directory: ${scanDir}`);
+    log(`📝 Using custom rules from: ${rulesPath}`);
+
+    const files = listFilesInDir(scanDir);
+    log('Files to scan:', files);
+
+    try {
+      execSync(`git config --global --add safe.directory "${scanDir}"`, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      warn("⚠️ Could not configure Git safe directory (not a git repo?)");
+    }
+
+    const gitleaksPath = await ensureGitleaksInstalled();
+    await runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath);
+    const result = await checkReport(reportPath);
+
+    const filtered = Array.isArray(result)
+      ? result.filter(item =>
+          !skipFiles.includes(path.basename(item.File)) &&
+          !item.File.includes('node_modules') &&
+          !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
+        )
+      : result;
+
+    if (filtered === "No credentials detected." || (Array.isArray(filtered) && filtered.length === 0)) {
+      console.log("✅ No credentials detected.");
+    } else {
+      console.log("🔐 Credentials detected:");
+      console.dir(filtered, { depth: null, colors: true });
+      process.exitCode = 1;
+    }
+
+    fs.unlinkSync(rulesPath);
+    console.log('✅ Credential scan completed.');
+  } catch (err) {
+    console.error("❌ Error during credential scan:", err.message || err);
+    process.exit(1);
+  }
+}
+
+// Start the scanning process
 main();
 
 // const { exec, execSync } = require('child_process');
