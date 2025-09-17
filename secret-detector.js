@@ -127,7 +127,7 @@ function createTempRulesFile() {
 // Run the Gitleaks command for secret scanning
 function runGitleaks(scanDir, reportPath, rulesPath) {
   return new Promise((resolve, reject) => {
-    const command = `gitleaks detect --source=${scanDir} --report-path=${reportPath} --config=${rulesPath} --no-banner`;
+    const command = `gitleaks detect --source=${scanDir} --report-path=${reportPath} --config=${rulesPath} --no-banner --verbose`;
     log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: '/bin/bash' }, (error, stdout, stderr) => {
