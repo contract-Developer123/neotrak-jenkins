@@ -28,14 +28,14 @@ const skipFiles = [
 // Function to check if Gitleaks is installed
 function checkGitleaksInstalled() {
   return new Promise((resolve, reject) => {
-    const command = os.platform() === 'win32' ? 'where gitleaks' : 'which gitleaks';
-    exec(command, (error, stdout, stderr) => {
+    const command = 'where gitleaks';
+    exec(command, { shell: true }, (error, stdout, stderr) => {
       if (error || stderr) {
-        // Check fallback location in user's home directory
+        // Check fallback location in Jenkins user's home directory
         const gitleaksPath = path.join(os.homedir(), 'gitleaks', 'gitleaks.exe');
-        if (os.platform() === 'win32' && fs.existsSync(gitleaksPath)) {
+        if (fs.existsSync(gitleaksPath)) {
           try {
-            const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8' });
+            const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
             console.log(`✅ Gitleaks found at ${gitleaksPath}. Version: ${version}`);
             resolve(gitleaksPath);
           } catch (err) {
@@ -45,73 +45,52 @@ function checkGitleaksInstalled() {
           reject(new Error("❌ Gitleaks is not installed or not found in PATH."));
         }
       } else {
-        console.log(`✅ Gitleaks found in PATH: ${stdout}`);
-        resolve(os.platform() === 'win32' ? stdout.trim().split('\n')[0] : stdout.trim());
+        const gitleaksPath = stdout.trim().split('\n')[0];
+        try {
+          const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+          console.log(`✅ Gitleaks found in PATH: ${gitleaksPath}. Version: ${version}`);
+          resolve(gitleaksPath);
+        } catch (err) {
+          reject(new Error(`❌ Gitleaks found in PATH but not executable: ${err.message}`));
+        }
       }
     });
   });
 }
 
-// Function to install Gitleaks (based on OS)
+// Function to install Gitleaks
 function installGitleaks() {
   return new Promise((resolve, reject) => {
-    const isWindows = os.platform() === 'win32';
-    let installCommand = '';
+    console.log('🔄 Installing Gitleaks for Jenkins...');
     const installDir = path.join(os.homedir(), 'gitleaks');
     const gitleaksPath = path.join(installDir, 'gitleaks.exe');
 
-    if (isWindows) {
-      // Check if Chocolatey is available
-      exec('choco --version', (error, stdout, stderr) => {
-        if (!error && stdout) {
-          console.log('🔄 Installing Gitleaks on Windows using Chocolatey...');
-          installCommand = 'choco install gitleaks -y';
-        } else {
-          console.log('🔄 Chocolatey not found. Installing Gitleaks manually on Windows...');
-          installCommand = `mkdir "${installDir}" & curl -L -o "${gitleaksPath}" https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-windows-amd64.exe`;
-        }
+    // Check if Chocolatey is available
+    exec('choco --version', { shell: true }, (error, stdout, stderr) => {
+      let installCommand;
+      if (!error && stdout) {
+        console.log('🔄 Installing Gitleaks using Chocolatey...');
+        installCommand = 'choco install gitleaks -y';
+      } else {
+        console.log('🔄 Chocolatey not found. Installing Gitleaks manually...');
+        installCommand = `mkdir "${installDir}" & curl -L -o "${gitleaksPath}" https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-windows-amd64.exe`;
+      }
 
-        exec(installCommand, { shell: true }, (error, stdout, stderr) => {
-          if (error || stderr) {
-            reject(new Error(`❌ Failed to install Gitleaks: ${stderr || error.message}`));
-          } else {
-            console.log(`✅ Gitleaks installed successfully. Output: ${stdout}`);
-            // Verify installation
-            try {
-              const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8' });
-              console.log(`Gitleaks version: ${version}`);
-              resolve(gitleaksPath);
-            } catch (err) {
-              reject(new Error(`❌ Gitleaks installed but not executable: ${err.message}`));
-            }
+      exec(installCommand, { shell: true }, (error, stdout, stderr) => {
+        if (error || stderr) {
+          reject(new Error(`❌ Failed to install Gitleaks: ${stderr || error.message}`));
+        } else {
+          console.log(`✅ Gitleaks installed successfully at ${gitleaksPath}. Output: ${stdout}`);
+          try {
+            const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+            console.log(`Gitleaks version: ${version}`);
+            resolve(gitleaksPath);
+          } catch (err) {
+            reject(new Error(`❌ Gitleaks installed but not executable: ${err.message}`));
           }
-        });
-      });
-    } else if (os.platform() === 'linux') {
-      console.log('🔄 Installing Gitleaks on Linux...');
-      installCommand = 'curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-linux-amd64.tar.gz | tar xz -C /tmp && sudo mv /tmp/gitleaks /usr/local/bin/gitleaks';
-      exec(installCommand, (error, stdout, stderr) => {
-        if (error || stderr) {
-          reject(new Error(`❌ Failed to install Gitleaks: ${stderr || error.message}`));
-        } else {
-          console.log(`✅ Gitleaks installed successfully. Output: ${stdout}`);
-          resolve('/usr/local/bin/gitleaks');
         }
       });
-    } else if (os.platform() === 'darwin') {
-      console.log('🔄 Installing Gitleaks on macOS...');
-      installCommand = 'brew install gitleaks';
-      exec(installCommand, (error, stdout, stderr) => {
-        if (error || stderr) {
-          reject(new Error(`❌ Failed to install Gitleaks: ${stderr || error.message}`));
-        } else {
-          console.log(`✅ Gitleaks installed successfully. Output: ${stdout}`);
-          resolve('gitleaks');
-        }
-      });
-    } else {
-      reject(new Error('❌ Unsupported OS for automatic Gitleaks installation.'));
-    }
+    });
   });
 }
 
@@ -184,9 +163,7 @@ function createTempRulesFile() {
 // Run the Gitleaks command for secret scanning
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    const command = os.platform() === 'win32' 
-      ? `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose`
-      : `${gitleaksPath} detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose`;
+    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose`;
     log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
@@ -205,7 +182,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   });
 }
 
-// Check the report for secrets (unchanged)
+// Check the report for secrets
 function checkReport(reportPath) {
   return new Promise((resolve, reject) => {
     fs.readFile(reportPath, 'utf8', (err, data) => {
@@ -221,7 +198,7 @@ function checkReport(reportPath) {
   });
 }
 
-// List files in the directory being scanned (unchanged)
+// List files in the directory being scanned
 function listFilesInDir(scanDir) {
   try {
     const files = fs.readdirSync(scanDir);
@@ -250,7 +227,7 @@ async function main() {
     log('Files to scan:', files);
 
     try {
-      execSync(`git config --global --add safe.directory "${scanDir}"`);
+      execSync(`git config --global --add safe.directory "${scanDir}"`, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) {
       warn("⚠️ Could not configure Git safe directory (not a git repo?)");
     }
@@ -279,7 +256,7 @@ async function main() {
         process.exit(1);
       }
 
-      await sendSecretsToApi(projectId, filtered);
+      await sendSecretsToApi(projectId, filtered); // Ensure this function is defined
       process.exitCode = 1;
     }
 
