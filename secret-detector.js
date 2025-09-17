@@ -14,10 +14,26 @@ function error(...args) {
 // Function to check if Gitleaks is installed and get its version
 function checkGitleaksInstalled() {
   return new Promise((resolve, reject) => {
+    // Remove any stale gitleaks.exe from C:\Windows\System32 to avoid PATH conflicts
+    const system32Path = 'C:\\Windows\\System32\\gitleaks.exe';
+    if (fs.existsSync(system32Path)) {
+      try {
+        fs.unlinkSync(system32Path);
+        log(`🗑️ Removed stale gitleaks.exe from ${system32Path}`);
+      } catch (err) {
+        log(`⚠️ Could not remove ${system32Path}: ${err.message}`);
+      }
+    }
+
     const command = 'where gitleaks';
     exec(command, { shell: true }, (error, stdout, stderr) => {
       if (!error && stdout) {
         const gitleaksPath = stdout.trim().split('\n')[0];
+        // Ensure we don't pick up C:\Windows\System32\gitleaks.exe
+        if (gitleaksPath.toLowerCase().includes('system32')) {
+          reject(new Error(`❌ Found incompatible gitleaks.exe in ${gitleaksPath}. Please remove it.`));
+          return;
+        }
         try {
           const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
           console.log(`✅ Gitleaks found in PATH: ${gitleaksPath}. Version: ${version}`);
@@ -53,7 +69,7 @@ function installGitleaks() {
       if (!error && stdout) {
         console.log('🔄 Installing Gitleaks using Chocolatey...');
         installCommand = 'choco install gitleaks -y --force';
-        expectedPath = 'gitleaks';
+        expectedPath = 'C:\\ProgramData\\chocolatey\\bin\\gitleaks.exe';
       } else {
         console.log('🔄 Chocolatey not found. Installing Gitleaks manually...');
         const installDir = path.join(os.homedir(), 'gitleaks');
