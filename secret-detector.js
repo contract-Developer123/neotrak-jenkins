@@ -226,7 +226,7 @@ function listFilesInDir(scanDir) {
 async function main() {
   console.log('🧾 Detecting credentials in folder...');
   try {
-    const scanDir = path.join(process.env.WORKSPACE || process.cwd(), 'neotrak-jenkins');
+    const scanDir = path.join(process.SCAN_DIR || process.cwd());
     const reportPath = path.join(scanDir, `credentials_report_${Date.now()}.json`);
     const rulesPath = createTempRulesFile();
 
