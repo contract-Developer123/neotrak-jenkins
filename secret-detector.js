@@ -40,7 +40,6 @@ function installGitleaks() {
   return new Promise((resolve, reject) => {
     console.log('Gitleaks is not installed. Installing...');
 
-    // Determine the platform and use the appropriate installation method
     const platform = os.platform();
     let installCommand;
 
@@ -54,7 +53,6 @@ function installGitleaks() {
       return reject(new Error(`Unsupported platform: ${platform}`));
     }
 
-    // Execute the install command
     exec(installCommand, (error, stdout, stderr) => {
       if (error) {
         return reject(`❌ Error installing Gitleaks: ${stderr}`);
@@ -81,6 +79,7 @@ async function ensureGitleaksInstalled() {
 
 // Custom Rules for Gitleaks
 const customRules = `
+// Add your custom Gitleaks rules here
 [[rules]]
 id = "strict-secret-detection"
 description = "Detect likely passwords or secrets with high entropy"
@@ -163,75 +162,6 @@ function checkReport(reportPath) {
   });
 }
 
-// Map the secrets to the desired format
-function mapToSBOMSecret(item) {
-  const fixedFile = fixFilePath(item.File);
-  return {
-    RuleID: item.RuleID,
-    Description: item.Description,
-    File: fixedFile,
-    Match: item.Match,
-    Secret: item.Secret,
-    StartLine: String(item.StartLine ?? ''),
-    EndLine: String(item.EndLine ?? ''),
-    StartColumn: String(item.StartColumn ?? ''),
-    EndColumn: String(item.EndColumn ?? ''),
-  };
-}
-
-// Fix the file path for reporting
-function fixFilePath(filePath) {
-  if (!filePath) return '///////'; // 7 slashes = 8 empty segments
-
-  let segments = filePath.split('/');
-  const requiredSegments = 8;
-
-  // Count only actual segments; empty strings from leading/trailing slashes are valid
-  const nonEmptyCount = segments.filter(Boolean).length;
-
-  while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
-    segments.unshift('');
-  }
-
-  return segments.join('/');
-}
-
-// Send secrets to external API (e.g., SBOM system)
-async function sendSecretsToApi(projectId, secretItems) {
-  const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${projectId}`;
-  const secretsData = secretItems.map(mapToSBOMSecret);
-
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-
-  const apiKey = process.env.X_API_KEY;
-  const secretKey = process.env.X_SECRET_KEY;
-  const tenantKey = process.env.X_TENANT_KEY;
-
-  if (apiKey) headers['x-api-key'] = apiKey;
-  if (secretKey) headers['x-secret-key'] = secretKey;
-  if (tenantKey) headers['x-tenant-key'] = tenantKey;
-
-  try {
-    log('Sending secrets:', JSON.stringify(secretsData, null, 2));
-
-    const response = await axios.post(apiUrl, secretsData, {
-      headers,
-      timeout: 60000,
-    });
-
-    if (response.status >= 200 && response.status < 300) {
-      log('✅ Secrets updated successfully in SBOM API.');
-    } else {
-      error(`❌ Failed to update secrets. Status: ${response.status}`);
-      error('Response body:', response.data);
-    }
-  } catch (err) {
-    error('❌ Error sending secrets to SBOM API:', err.message || err);
-  }
-}
-
 // List files in the directory being scanned
 function listFilesInDir(scanDir) {
   try {
@@ -240,8 +170,10 @@ function listFilesInDir(scanDir) {
     files.forEach(file => {
       console.log(file);
     });
+    return files;
   } catch (err) {
     console.error(`❌ Error reading directory "${scanDir}":`, err.message || err);
+    return [];
   }
 }
 
@@ -256,8 +188,9 @@ async function main() {
     console.log(`📂 Scanning directory: ${scanDir}`);
     log(`📝 Using custom inline rules from: ${rulesPath}`);
 
-    // Print files in the scan directory (for debugging purposes)
-    listFilesInDir(scanDir);
+    // List files in the directory (for debugging purposes)
+    const files = listFilesInDir(scanDir);
+    log('Files to scan:', files);
 
     // Set Git safe directory for Jenkins context
     try {
