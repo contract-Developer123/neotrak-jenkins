@@ -44,18 +44,18 @@ function installGitleaks() {
     let installCommand;
 
     if (platform === 'win32') {
-      installCommand = 'curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-windows-amd64.exe -o gitleaks.exe && move /Y gitleaks.exe C:\\Windows\\System32\\gitleaks.exe';
+      installCommand = 'curl -L -o gitleaks.exe https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-windows-amd64.exe && move /Y gitleaks.exe C:\\Windows\\System32\\gitleaks.exe';
     } else if (platform === 'darwin') {
       installCommand = 'brew install gitleaks';
     } else if (platform === 'linux') {
-      installCommand = 'curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64.tar.gz | tar xz -C /tmp && sudo mv /tmp/gitleaks /usr/local/bin';
+      installCommand = 'curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks-linux-amd64.tar.gz | tar xz -C /tmp && sudo mv /tmp/gitleaks /usr/local/bin';
     } else {
       return reject(new Error(`Unsupported platform: ${platform}`));
     }
 
     exec(installCommand, (error, stdout, stderr) => {
       if (error) {
-        return reject(`❌ Error installing Gitleaks: ${stderr}`);
+        return reject(new Error(`❌ Error installing Gitleaks: ${stderr}`));
       }
       resolve(stdout || stderr);
     });
