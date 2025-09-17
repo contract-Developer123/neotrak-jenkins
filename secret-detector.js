@@ -14,7 +14,7 @@ function error(...args) {
 // Function to check if Gitleaks is installed and get its version
 function checkGitleaksInstalled() {
   return new Promise((resolve, reject) => {
-    // Remove any stale gitleaks.exe from C:\Windows\System32 to avoid PATH conflicts
+    // Check for stale gitleaks.exe in C:\Windows\System32
     const system32Path = 'C:\\Windows\\System32\\gitleaks.exe';
     if (fs.existsSync(system32Path)) {
       try {
@@ -29,7 +29,6 @@ function checkGitleaksInstalled() {
     exec(command, { shell: true }, (error, stdout, stderr) => {
       if (!error && stdout) {
         const gitleaksPath = stdout.trim().split('\n')[0];
-        // Ensure we don't pick up C:\Windows\System32\gitleaks.exe
         if (gitleaksPath.toLowerCase().includes('system32')) {
           reject(new Error(`❌ Found incompatible gitleaks.exe in ${gitleaksPath}. Please remove it.`));
           return;
@@ -99,10 +98,12 @@ function installGitleaks() {
 async function main() {
   try {
     await checkGitleaksInstalled();
+    console.log('✅ Gitleaks is ready for use.');
   } catch (err) {
     console.log('Gitleaks not found. Attempting to install...');
     try {
       await installGitleaks();
+      console.log('✅ Gitleaks installed and verified.');
     } catch (installErr) {
       error(`❌ Failed to install Gitleaks: ${installErr.message}`);
       process.exit(1);
@@ -112,6 +113,121 @@ async function main() {
 
 // Start the process
 main();
+
+// const { exec, execSync } = require('child_process');
+// const fs = require('fs');
+// const os = require('os');
+// const path = require('path');
+
+// const debugMode = process.env.DEBUG_MODE === 'true';
+// function log(...args) {
+//   if (debugMode) console.log(...args);
+// }
+// function error(...args) {
+//   console.error(...args);
+// }
+
+// // Function to check if Gitleaks is installed and get its version
+// function checkGitleaksInstalled() {
+//   return new Promise((resolve, reject) => {
+//     // Remove any stale gitleaks.exe from C:\Windows\System32 to avoid PATH conflicts
+//     const system32Path = 'C:\\Windows\\System32\\gitleaks.exe';
+//     if (fs.existsSync(system32Path)) {
+//       try {
+//         fs.unlinkSync(system32Path);
+//         log(`🗑️ Removed stale gitleaks.exe from ${system32Path}`);
+//       } catch (err) {
+//         log(`⚠️ Could not remove ${system32Path}: ${err.message}`);
+//       }
+//     }
+
+//     const command = 'where gitleaks';
+//     exec(command, { shell: true }, (error, stdout, stderr) => {
+//       if (!error && stdout) {
+//         const gitleaksPath = stdout.trim().split('\n')[0];
+//         // Ensure we don't pick up C:\Windows\System32\gitleaks.exe
+//         if (gitleaksPath.toLowerCase().includes('system32')) {
+//           reject(new Error(`❌ Found incompatible gitleaks.exe in ${gitleaksPath}. Please remove it.`));
+//           return;
+//         }
+//         try {
+//           const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+//           console.log(`✅ Gitleaks found in PATH: ${gitleaksPath}. Version: ${version}`);
+//           resolve(gitleaksPath);
+//         } catch (err) {
+//           reject(new Error(`❌ Gitleaks found in PATH but not executable: ${err.message}`));
+//         }
+//       } else {
+//         const gitleaksPath = path.join(os.homedir(), 'gitleaks', 'gitleaks.exe');
+//         if (fs.existsSync(gitleaksPath)) {
+//           try {
+//             const version = execSync(`"${gitleaksPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+//             console.log(`✅ Gitleaks found at ${gitleaksPath}. Version: ${version}`);
+//             resolve(gitleaksPath);
+//           } catch (err) {
+//             reject(new Error(`❌ Gitleaks found at ${gitleaksPath} but not executable: ${err.message}`));
+//           }
+//         } else {
+//           reject(new Error('❌ Gitleaks is not installed or not found in PATH.'));
+//         }
+//       }
+//     });
+//   });
+// }
+
+// // Function to install Gitleaks
+// function installGitleaks() {
+//   return new Promise((resolve, reject) => {
+//     console.log('🔄 Installing Gitleaks for Jenkins...');
+//     exec('choco --version', { shell: true }, (error, stdout, stderr) => {
+//       let installCommand;
+//       let expectedPath;
+//       if (!error && stdout) {
+//         console.log('🔄 Installing Gitleaks using Chocolatey...');
+//         installCommand = 'choco install gitleaks -y --force';
+//         expectedPath = 'C:\\ProgramData\\chocolatey\\bin\\gitleaks.exe';
+//       } else {
+//         console.log('🔄 Chocolatey not found. Installing Gitleaks manually...');
+//         const installDir = path.join(os.homedir(), 'gitleaks');
+//         expectedPath = path.join(installDir, 'gitleaks.exe');
+//         installCommand = `mkdir "${installDir}" & curl -L -o "${expectedPath}" https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-windows-amd64.exe`;
+//       }
+
+//       exec(installCommand, { shell: true }, (error, stdout, stderr) => {
+//         if (error || stderr) {
+//           reject(new Error(`❌ Failed to install Gitleaks: ${stderr || error.message}`));
+//           return;
+//         }
+//         console.log(`✅ Gitleaks installed successfully. Output: ${stdout}`);
+//         try {
+//           const version = execSync(`"${expectedPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+//           console.log(`Gitleaks version: ${version}`);
+//           resolve(expectedPath);
+//         } catch (err) {
+//           reject(new Error(`❌ Gitleaks installed but not executable: ${err.message}`));
+//         }
+//       });
+//     });
+//   });
+// }
+
+// // Main function to check or install Gitleaks
+// async function main() {
+//   try {
+//     await checkGitleaksInstalled();
+//   } catch (err) {
+//     console.log('Gitleaks not found. Attempting to install...');
+//     try {
+//       await installGitleaks();
+//     } catch (installErr) {
+//       error(`❌ Failed to install Gitleaks: ${installErr.message}`);
+//       process.exit(1);
+//     }
+//   }
+// }
+
+// // Start the process
+// main();
 
 
 // const { exec, execSync } = require('child_process');
