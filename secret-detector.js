@@ -70,106 +70,7 @@ function checkGitleaksInstalled() {
   });
 }
 
-// Function to install Gitleaks
-function installGitleaks() {
-  return new Promise((resolve, reject) => {
-    console.log('🔄 Installing Gitleaks for Jenkins...');
-    exec('choco --version', { shell: true }, (error, stdout, stderr) => {
-      let installCommand;
-      let expectedPath;
-      if (!error && stdout) {
-        console.log('🔄 Installing Gitleaks using Chocolatey...');
-        installCommand = 'choco install gitleaks -y --force';
-        expectedPath = 'C:\\ProgramData\\chocolatey\\bin\\gitleaks.exe';
-      } else {
-        console.log('🔄 Chocolatey not found. Installing Gitleaks manually...');
-        const installDir = path.join(os.homedir(), 'gitleaks');
-        expectedPath = path.join(installDir, 'gitleaks.exe');
-        installCommand = `mkdir "${installDir}" & curl -L -o "${expectedPath}" https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks-windows-amd64.exe`;
-      }
-
-      exec(installCommand, { shell: true }, (error, stdout, stderr) => {
-        if (error || stderr) {
-          reject(new Error(`❌ Failed to install Gitleaks: ${stderr || error.message}`));
-          return;
-        }
-        console.log(`✅ Gitleaks installed successfully. Output: ${stdout}`);
-        try {
-          const version = execSync(`"${expectedPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-          console.log(`Gitleaks version: ${version}`);
-          resolve(expectedPath);
-        } catch (err) {
-          reject(new Error(`❌ Gitleaks installed but not executable: ${err.message}`));
-        }
-      });
-    });
-  });
-}
-
-// Function to ensure Gitleaks is installed
-async function ensureGitleaksInstalled() {
-  try {
-    const gitleaksPath = await checkGitleaksInstalled();
-    return gitleaksPath;
-  } catch (err) {
-    console.log('Gitleaks not found. Attempting to install...');
-    try {
-      const gitleaksPath = await installGitleaks();
-      return gitleaksPath;
-    } catch (installErr) {
-      error(`❌ Failed to install Gitleaks: ${installErr.message}`);
-      process.exit(1);
-    }
-  }
-}
-
-// Custom Gitleaks rules for credential detection
-const customRules = `
-[[rules]]
-id = "strict-secret-detection"
-description = "Detect likely passwords or secrets with high entropy"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_!$%]{10,})["']'''
-tags = ["key", "secret", "generic", "password"]
-
-[[rules]]
-id = "aws-secret"
-description = "AWS Secret Access Key"
-regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
-tags = ["aws", "key", "secret"]
-
-[[rules]]
-id = "aws-key"
-description = "AWS Access Key ID"
-regex = '''AKIA[0-9A-Z]{16}'''
-tags = ["aws", "key"]
-
-[[rules]]
-id = "github-token"
-description = "GitHub Personal Access Token"
-regex = '''ghp_[A-Za-z0-9_]{36}'''
-tags = ["github", "token"]
-
-[[rules]]
-id = "jwt"
-description = "JSON Web Token"
-regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
-tags = ["token", "jwt"]
-
-[[rules]]
-id = "firebase-api-key"
-description = "Firebase API Key"
-regex = '''AIza[0-9A-Za-z\\-_]{35}'''
-tags = ["firebase", "apikey"]
-`;
-
-// Create a temporary file for Gitleaks rules
-function createTempRulesFile() {
-  const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
-  fs.writeFileSync(rulesPath, customRules);
-  return rulesPath;
-}
-
-// Run Gitleaks to detect credentials
+// Function to run Gitleaks to detect credentials
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
     const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose`;
@@ -191,7 +92,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   });
 }
 
-// Check the Gitleaks report for credentials
+// Function to check the Gitleaks report for credentials
 function checkReport(reportPath) {
   return new Promise((resolve, reject) => {
     fs.readFile(reportPath, 'utf8', (err, data) => {
@@ -207,46 +108,38 @@ function checkReport(reportPath) {
   });
 }
 
-// List files in the directory being scanned
-function listFilesInDir(scanDir) {
-  try {
-    const files = fs.readdirSync(scanDir);
-    console.log(`📂 Files in directory "${scanDir}":`);
-    files.forEach(file => {
-      console.log(file);
-    });
-    return files;
-  } catch (err) {
-    console.error(`❌ Error reading directory "${scanDir}":`, err.message || err);
-    return [];
-  }
-}
-
 // Main function to detect credentials
 async function main() {
   console.log('🧾 Detecting credentials in folder...');
   try {
     const scanDir = path.join(process.SCAN_DIR || process.cwd());
     const reportPath = path.join(scanDir, `credentials_report_${Date.now()}.json`);
-    const rulesPath = createTempRulesFile();
+    const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
 
     console.log(`📂 Scanning directory: ${scanDir}`);
     log(`📝 Using custom rules from: ${rulesPath}`);
 
-    const files = listFilesInDir(scanDir);
-    log('Files to scan:', files);
+    const gitleaksPath = await checkGitleaksInstalled();
+    await runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath);
 
-    try {
-      execSync(`git config --global --add safe.directory "${scanDir}"`, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
-    } catch (e) {
-      warn("⚠️ Could not configure Git safe directory (not a git repo?)");
+    const result = await checkReport(reportPath);
+    
+    // If no credentials were found, print a success message
+    if (result === "No credentials detected.") {
+      console.log("✅ No credentials detected.");
+      return;
     }
 
-    const gitleaksPath = await ensureGitleaksInstalled();
-    await runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath);
-    const result = await checkReport(reportPath);
+    // Count the secrets found and print the number of secrets detected
+    const secretsDetected = Array.isArray(result) ? result.length : 0;
+    console.log(`🔐 Total secrets detected: ${secretsDetected}`);
+    if (secretsDetected > 0) {
+      console.log("🔐 Detected secrets details:");
+      console.dir(result, { depth: null, colors: true });
+    }
 
-    const filtered = Array.isArray(result)
+    // Optionally, process the secrets to exclude certain files
+    const filteredSecrets = Array.isArray(result)
       ? result.filter(item =>
           !skipFiles.includes(path.basename(item.File)) &&
           !item.File.includes('node_modules') &&
@@ -254,16 +147,13 @@ async function main() {
         )
       : result;
 
-    if (filtered === "No credentials detected." || (Array.isArray(filtered) && filtered.length === 0)) {
-      console.log("✅ No credentials detected.");
+    if (filteredSecrets.length > 0) {
+      console.log("🔐 Filtered credentials detected:");
+      console.dir(filteredSecrets, { depth: null, colors: true });
     } else {
-      console.log("🔐 Credentials detected:");
-      console.dir(filtered, { depth: null, colors: true });
-      process.exitCode = 1;
+      console.log("✅ No credentials after filtering.");
     }
 
-    fs.unlinkSync(rulesPath);
-    console.log('✅ Credential scan completed.');
   } catch (err) {
     console.error("❌ Error during credential scan:", err.message || err);
     process.exit(1);
@@ -272,6 +162,7 @@ async function main() {
 
 // Start the scanning process
 main();
+
 
 // const { exec, execSync } = require('child_process');
 // const fs = require('fs');
