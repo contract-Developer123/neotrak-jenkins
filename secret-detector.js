@@ -3,17 +3,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// const debugMode = process.env.DEBUG_MODE === 'true';
-// function log(...args) {
-//   if (debugMode) console.log(...args);
-// }
-// function warn(...args) {
-//   if (debugMode) console.warn(...args);
-// }
-// function error(...args) {
-//   console.error(...args);
-// }
-
 const skipFiles = [
   'package.json',
   'package-lock.json',
@@ -31,9 +20,9 @@ function checkGitleaksInstalled() {
     if (fs.existsSync(system32Path)) {
       try {
         fs.unlinkSync(system32Path);
-        log(`🗑️ Removed stale gitleaks.exe from ${system32Path}`);
+        console.log(`🗑️ Removed stale gitleaks.exe from ${system32Path}`);
       } catch (err) {
-        log(`⚠️ Could not remove ${system32Path}: ${err.message}`);
+        console.log(`⚠️ Could not remove ${system32Path}: ${err.message}`);
       }
     }
 
@@ -74,10 +63,10 @@ function checkGitleaksInstalled() {
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
     const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json`;
-    log(`🔍 Running Gitleaks:\n${command}`);
+    console.log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
-      log('📤 Gitleaks STDOUT:\n', stdout); // This will print detailed output, including which files are being scanned.
+      console.log('📤 Gitleaks STDOUT:\n', stdout); // This will print detailed output, including which files are being scanned.
       
       // Capture file names from the output and log them
       if (stdout) {
@@ -98,7 +87,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
       }
 
       if (stderr && stderr.trim()) {
-        warn('⚠️ Gitleaks STDERR:\n', stderr);
+        console.warn('⚠️ Gitleaks STDERR:\n', stderr);
       }
 
       if (error) {
@@ -110,7 +99,6 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
   });
 }
-
 
 // Function to check the Gitleaks report for credentials
 function checkReport(reportPath) {
@@ -158,7 +146,7 @@ async function main() {
     const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
 
     console.log(`📂 Scanning directory: ${scanDir}`);
-    log(`📝 Using custom rules from: ${rulesPath}`);
+    console.log(`📝 Using custom rules from: ${rulesPath}`);
 
     const gitleaksPath = await checkGitleaksInstalled();
     await runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath);
@@ -210,6 +198,7 @@ async function main() {
 
 // Start the scanning process
 main();
+
 
 
 
