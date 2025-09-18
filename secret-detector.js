@@ -121,18 +121,9 @@ function checkGitleaksInstalled() {
   });
 }
 
-function getLatestCommit() {
-  try {
-    return execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  } catch (err) {
-    throw new Error(`❌ Failed to get latest commit: ${err.message}`);
-  }
-}
-
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    const latestCommit = getLatestCommit();
-    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json --commit="${latestCommit}"`;
+    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json`;
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
