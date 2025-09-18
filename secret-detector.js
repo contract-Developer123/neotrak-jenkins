@@ -140,12 +140,18 @@ function getChangedFiles() {
 }
 
 // Run Gitleaks to scan the latest commit's changed files
-function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath, changedFiles) {
-  return new Promise((resolve, reject) => {
-    const changedFilesArg = changedFiles.map(file => `"${file}"`).join(' ');
-    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${changedFilesArg}`;
-    console.log(`🔍 Running Gitleaks on changed files:\n${command}`);
+async function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath, changedFiles) {
+  if (changedFiles.length === 0) {
+    console.log("No files changed in the latest commit. Skipping Gitleaks scan.");
+    return;
+  }
 
+  const changedFilesArg = changedFiles.map(file => `"${file}"`).join(' ');
+  const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${changedFilesArg}`;
+  
+  console.log('Running Gitleaks command:', command); // Log the full command for debugging
+
+  return new Promise((resolve, reject) => {
     exec(command, { shell: true }, (error, stdout, stderr) => {
       if (error) {
         reject(`❌ Error executing Gitleaks: ${stderr}`);
@@ -177,6 +183,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath, changedFiles)
     });
   });
 }
+
 
 // Check the report for credentials and map them
 function checkReport(reportPath) {
