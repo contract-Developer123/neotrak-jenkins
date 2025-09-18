@@ -36,40 +36,22 @@ const skipFiles = [
 // Custom rules for password detection and other secrets
 const customRules = `
 [[rules]]
-id = "password-detection"
+id = "password"
 description = "Detect likely passwords"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{8,})["']'''
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9!@#$%^&*()_+=]{8,})["']'''
 tags = ["password", "key", "secret", "token"]
 
 [[rules]]
-id = "api-keys-and-secrets"
-description = "Detect likely API keys and secret keys in environment variables"
-regex = '''(?i)(X_API_KEY|X_SECRET_KEY|PROJECT_ID|WORKSPACE_ID|X_TENANT_KEY|access_token|secret_key)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
-tags = ["api_key", "secret", "env_var", "token"]
-
-[[rules]]
-id = "general-secrets"
-description = "Detect general secrets in the code"
-regex = '''(?i)(api_key|secret_key|password|private_key|token|access_token|client_secret|aws_secret_access_key|GITHUB_TOKEN|JWT|Bearer)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
-tags = ["api_key", "secret", "env_var", "token", "jwt", "password"]
-
-[[rules]]
-id = "password"
-description = "Detect passwords in the code"
-regex = '''(?i)(password|pass|pwd|user_password|db_password|admin_password|private_password|client_password)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9!@#$%^&*()_+=]{8,})["']'''
-tags = ["password", "secret"]
+id = "api-and-general-secrets"
+description = "Detect likely API keys and general secrets"
+regex = '''(?i)(X_API_KEY|X_SECRET_KEY|PROJECT_ID|WORKSPACE_ID|X_TENANT_KEY|access_token|secret_key|api_key|client_secret|aws_secret_access_key|GITHUB_TOKEN|JWT|Bearer)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
+tags = ["api_key", "secret", "env_var", "token", "jwt"]
 
 [[rules]]
 id = "jwt-token"
-description = "Detect JWT (JSON Web Tokens) in the code"
-regex = '''(?i)(Bearer|JWT|access_token|id_token)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_\\.]{64,})["']'''
-tags = ["jwt", "token", "bearer"]
-
-[[rules]]
-id = "oauth-token"
-description = "Detect OAuth tokens in the code"
-regex = '''(?i)(oauth_token|oauth_access_token|oauth)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
-tags = ["oauth", "token", "access_token"]
+description = "Detect JWT and OAuth tokens in the code"
+regex = '''(?i)(Bearer|JWT|access_token|id_token|oauth_token|oauth_access_token)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_\\.]{64,})["']'''
+tags = ["jwt", "token", "bearer", "oauth"]
 
 [[rules]]
 id = "private-key"
@@ -94,6 +76,7 @@ id = "jwt"
 description = "JSON Web Token"
 regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
 tags = ["token", "jwt"]
+
 `;
 
 // Function to check if Gitleaks is installed
