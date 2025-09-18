@@ -8,7 +8,7 @@ const customRules = `
 [[rules]]
 id = "strict-secret-detection"
 description = "Detect likely passwords or secrets with high entropy"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_!$%]{10,})["']'''
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\s"']*[=:][\s"']*["']([A-Za-z0-9@#\-_!$%]*)["']'''
 tags = ["key", "secret", "generic", "password"]
 
 [[rules]]
