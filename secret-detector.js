@@ -28,7 +28,8 @@ const skipFiles = [
   'build.gradle',
   'requirements.txt',
   'README.md',
-  '.gitignore'
+  '.gitignore',
+  'Jenkinsfile' // Added to skip secrets in Jenkinsfile (remove if not desired)
 ];
 
 const customRules = `
@@ -149,8 +150,9 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
       }
 
-      if (error) {
-        reject(`❌ Error executing Gitleaks: ${stderr}`);
+      // Handle Gitleaks exit codes (0: no leaks, 1: leaks found, others: errors)
+      if (error && error.code !== 1) {
+        reject(`❌ Error executing Gitleaks: ${stderr || error.message}`);
         return;
       }
 
@@ -200,7 +202,7 @@ async function sendSecretsToApi(secretItems) {
     return;
   }
   const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${projectId}`;
-  const secretsData = secretItems.map(mapToSecretFormat); // Fixed: Use mapToSecretFormat instead of mapToSBOMSecret
+  const secretsData = secretItems.map(mapToSecretFormat);
 
   const headers = {
     'Content-Type': 'application/json',
