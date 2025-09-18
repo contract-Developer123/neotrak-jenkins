@@ -201,16 +201,11 @@ function saveSecretsToFile(secretItems, filePath) {
   console.log(`✅ Saved detected secrets to ${filePath}`);
 }
 
-// Send detected secrets to the API
+// Function to send secrets to the API
 async function sendSecretsToApi(secretItems) {
-  const projectId = process.env.PROJECT_ID; // Fetch the project ID from environment
-  if (!projectId) {
-    console.error("❌ PROJECT_ID is not set in the environment variables.");
-    return;
-  }
-  const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${projectId}`;
-  const secretsData = secretItems.map(mapToSecretFormat);
+  const apiUrl = `https://dev.neoTrak.io/open-pulse/project/update-secrets/${process.env.PROJECT_ID}`;
 
+  // Prepare headers
   const headers = {
     'Content-Type': 'application/json',
   };
@@ -219,23 +214,17 @@ async function sendSecretsToApi(secretItems) {
   const secretKey = process.env.X_SECRET_KEY;
   const tenantKey = process.env.X_TENANT_KEY;
 
+  // Add custom headers if available
   if (apiKey) headers['x-api-key'] = apiKey;
   if (secretKey) headers['x-secret-key'] = secretKey;
   if (tenantKey) headers['x-tenant-key'] = tenantKey;
 
   try {
-    console.log('Sending secrets:', JSON.stringify(secretsData, null, 2));
-
-    const response = await axios.post(apiUrl, secretsData, { headers, timeout: 60000 });
-
-    if (response.status >= 200 && response.status < 300) {
-      console.log('✅ Secrets updated successfully in SBOM API.');
-    } else {
-      console.error(`❌ Failed to update secrets. Status: ${response.status}`);
-      console.error('Response body:', response.data);
-    }
-  } catch (err) {
-    console.error('❌ Error sending secrets to SBOM API:', err.message || err);
+    // Send request with the formatted secrets
+    const response = await axios.post(apiUrl, { secrets: secretItems }, { headers });
+    console.log(`📤 Secrets sent successfully:`, response.data);
+  } catch (error) {
+    console.error(`❌ Failed to send secrets: ${error.message}`);
   }
 }
 
