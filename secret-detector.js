@@ -3,50 +3,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// Custom Rules for Gitleaks
-const customRules = `
-[[rules]]
-id = "strict-secret-detection"
-description = "Detect likely passwords or secrets with any length"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)\s*=\s*["']([^"']+)["']'''
-tags = ["key", "secret", "generic", "password"]
-
-[[rules]]
-id = "env-style-api-key"
-description = "Detect environment-style or constant-like secrets"
-regex = '''(?i)[A-Z0-9_]{6,}\s*=\s*['"][A-Za-z0-9\-_]{10,}['"]'''
-tags = ["key", "secret", "generic"]
-
-[[rules]]
-id = "aws-secret"
-description = "AWS Secret Access Key"
-regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
-tags = ["aws", "key", "secret"]
-
-[[rules]]
-id = "aws-key"
-description = "AWS Access Key ID"
-regex = '''AKIA[0-9A-Z]{16}'''
-tags = ["aws", "key"]
-
-[[rules]]
-id = "github-token"
-description = "GitHub Personal Access Token"
-regex = '''ghp_[A-Za-z0-9_]{36}'''
-tags = ["github", "token"]
-
-[[rules]]
-id = "jwt"
-description = "JSON Web Token"
-regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
-tags = ["token", "jwt"]
-
-[[rules]]
-id = "firebase-api-key"
-description = "Firebase API Key"
-regex = '''AIza[0-9A-Za-z\\-_]{35}'''
-tags = ["firebase", "apikey"]
-`;
+const skipFiles = [
+  'package.json',
+  'package-lock.json',
+  'pom.xml',
+  'build.gradle',
+  'requirements.txt',
+  'README.md',
+  '.gitignore'
+];
 
 // Function to check if Gitleaks is installed
 function checkGitleaksInstalled() {
@@ -95,27 +60,24 @@ function checkGitleaksInstalled() {
 }
 
 // Function to run Gitleaks to detect credentials and print the files it's scanning
-function runGitleaks(scanDir, reportPath, customRulesPath, gitleaksPath) {
+function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    // Create custom rules file dynamically
-    fs.writeFileSync(customRulesPath, customRules);
-
-    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${customRulesPath}" --no-banner --verbose --report-format=json`;
+    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json`;
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
-      console.log('📤 Gitleaks STDOUT:\n', stdout); // This will print detailed output, including which files are being scanned.
-      
+      console.log('📤 Gitleaks STDOUT:\n', stdout);
+
       // Capture file names from the output and log them
       if (stdout) {
         const fileScanningRegex = /Scanning file: (.+)/g;
         let match;
         const scannedFiles = [];
-        
+
         while ((match = fileScanningRegex.exec(stdout)) !== null) {
           scannedFiles.push(match[1]);
         }
-        
+
         if (scannedFiles.length > 0) {
           console.log("🔍 Files being scanned for secrets:");
           scannedFiles.forEach(file => {
@@ -138,29 +100,64 @@ function runGitleaks(scanDir, reportPath, customRulesPath, gitleaksPath) {
   });
 }
 
+// Function to check the Gitleaks report for credentials
+function checkReport(reportPath) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(reportPath, 'utf8', (err, data) => {
+      if (err) return reject(err);
+
+      try {
+        const report = JSON.parse(data);
+        resolve(report.length ? report : "No credentials detected.");
+      } catch (e) {
+        reject(new Error("Invalid JSON in Gitleaks report."));
+      }
+    });
+  });
+}
+
+// Function to fix file paths (if necessary, depending on your system)
+function fixFilePath(filePath) {
+  return path.normalize(filePath);
+}
+
+// Function to map secret information to the desired structure
+function mapToSecretFormat(item) {
+  const fixedFile = fixFilePath(item.File);
+  return {
+    RuleID: item.RuleID,
+    Description: item.Description,
+    File: fixedFile,
+    Match: item.Match,
+    Secret: item.Secret,
+    StartLine: String(item.StartLine ?? ''),
+    EndLine: String(item.EndLine ?? ''),
+    StartColumn: String(item.StartColumn ?? ''),
+    EndColumn: String(item.EndColumn ?? ''),
+  };
+}
+
 // Main function to detect credentials
 async function main() {
   console.log('🧾 Detecting credentials in folder...');
   try {
     const scanDir = path.join(process.SCAN_DIR || process.cwd());
     const reportPath = path.join(scanDir, `credentials_report_${Date.now()}.json`);
-    const customRulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
+    const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
 
     console.log(`📂 Scanning directory: ${scanDir}`);
-    console.log(`📝 Using custom rules from: ${customRulesPath}`);
+    console.log(`📝 Using custom rules from: ${rulesPath}`);
 
     const gitleaksPath = await checkGitleaksInstalled();
-    await runGitleaks(scanDir, reportPath, customRulesPath, gitleaksPath);
+    await runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath);
 
     const result = await checkReport(reportPath);
 
-    // If no credentials were found, print a success message
     if (result === "No credentials detected.") {
       console.log("✅ No credentials detected.");
       return;
     }
 
-    // Count the secrets found and print the number of secrets detected
     const secretsDetected = Array.isArray(result) ? result.length : 0;
     console.log(`🔐 Total secrets detected: ${secretsDetected}`);
 
@@ -172,6 +169,24 @@ async function main() {
       });
     }
 
+    const filteredSecrets = Array.isArray(result)
+      ? result.filter(item =>
+          !skipFiles.includes(path.basename(item.File)) &&
+          !item.File.includes('node_modules') &&
+          !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
+        )
+      : result;
+
+    if (filteredSecrets.length > 0) {
+      console.log("🔐 Filtered credentials detected:");
+      filteredSecrets.forEach(item => {
+        const formattedFilteredSecret = mapToSecretFormat(item);
+        console.log(formattedFilteredSecret);
+      });
+    } else {
+      console.log("✅ No credentials after filtering.");
+    }
+
   } catch (err) {
     console.error("❌ Error during credential scan:", err.message || err);
     process.exit(1);
@@ -180,6 +195,7 @@ async function main() {
 
 // Start the scanning process
 main();
+
 
 
 // const { exec, execSync } = require('child_process');
