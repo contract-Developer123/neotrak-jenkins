@@ -2,6 +2,7 @@ const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const axios = require('axios'); // Add axios for making API calls
 
 const skipFiles = [
   'package.json',
@@ -13,6 +14,69 @@ const skipFiles = [
   '.gitignore'
   // Do not include Jenkinsfile in this list unless explicitly needed
 ];
+
+// Custom rules for password detection and other secrets
+const customRules = `
+[[rules]]
+id = "password-detection"
+description = "Detect likely passwords"
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{8,})["']'''
+tags = ["password", "key", "secret", "token"]
+
+[[rules]]
+id = "api-keys-and-secrets"
+description = "Detect likely API keys and secret keys in environment variables"
+regex = '''(?i)(X_API_KEY|X_SECRET_KEY|PROJECT_ID|WORKSPACE_ID|X_TENANT_KEY|access_token|secret_key)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
+tags = ["api_key", "secret", "env_var", "token"]
+
+[[rules]]
+id = "general-secrets"
+description = "Detect general secrets in the code"
+regex = '''(?i)(api_key|secret_key|password|private_key|token|access_token|client_secret|aws_secret_access_key|GITHUB_TOKEN|JWT|Bearer)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
+tags = ["api_key", "secret", "env_var", "token", "jwt", "password"]
+
+[[rules]]
+id = "password"
+description = "Detect passwords in the code"
+regex = '''(?i)(password|pass|pwd|user_password|db_password|admin_password|private_password|client_password)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9!@#$%^&*()_+=]{8,})["']'''
+tags = ["password", "secret"]
+
+[[rules]]
+id = "jwt-token"
+description = "Detect JWT (JSON Web Tokens) in the code"
+regex = '''(?i)(Bearer|JWT|access_token|id_token)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_\\.]{64,})["']'''
+tags = ["jwt", "token", "bearer"]
+
+[[rules]]
+id = "oauth-token"
+description = "Detect OAuth tokens in the code"
+regex = '''(?i)(oauth_token|oauth_access_token|oauth)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
+tags = ["oauth", "token", "access_token"]
+
+[[rules]]
+id = "private-key"
+description = "Detect private keys (RSA, DSA, etc.) in the code"
+regex = '''(?i)(private_key|api_private_key|client_private_key|rsa_private_key)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9+/=]{500,})["']'''
+tags = ["private_key", "secret"]
+
+[[rules]]
+id = "client-secret"
+description = "Detect client secrets in the code"
+regex = '''(?i)(client_secret|consumer_secret)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{32,})["']'''
+tags = ["client_secret", "secret"]
+
+[[rules]]
+id = "access-token"
+description = "Detect access tokens in the code"
+regex = '''(?i)(access_token|auth_token)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{32,})["']'''
+tags = ["access_token", "token", "secret"]
+
+[[rules]]
+id = "jwt"
+description = "JSON Web Token"
+regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
+tags = ["token", "jwt"]
+`;
 
 // Function to check if Gitleaks is installed
 function checkGitleaksInstalled() {
@@ -138,20 +202,25 @@ function mapToSecretFormat(item) {
   };
 }
 
-// Update the custom rule for password detection to make it more general
-const customRules = `
-[[rules]]
-id = "password-detection"
-description = "Detect likely passwords"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{8,})["']'''
-tags = ["password", "key", "secret", "token"]
+// API call function to send secrets to an API endpoint
+async function sendSecretsToApi(secretsData) {
+  const apiUrl = 'https://your-api-endpoint.com/endpoint'; // Replace with your actual API endpoint
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer your-api-token', // Optional: Add if your API requires an authorization token
+  };
 
-[[rules]]
-id = "jwt"
-description = "JSON Web Token"
-regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
-tags = ["token", "jwt"]
-`;
+  try {
+    const response = await axios.post(apiUrl, secretsData, { headers });
+    if (response.status === 200) {
+      console.log('✅ Successfully sent secrets to the API.');
+    } else {
+      console.error(`❌ Failed to send secrets. Status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('❌ Error sending secrets to API:', error.message);
+  }
+}
 
 async function main() {
   console.log('🧾 Detecting credentials in folder...');
@@ -159,6 +228,9 @@ async function main() {
     const scanDir = path.join(process.SCAN_DIR || process.cwd());
     const reportPath = path.join(scanDir, `credentials_report_${Date.now()}.json`);
     const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
+
+    // Save custom rules to a temporary file
+    fs.writeFileSync(rulesPath, customRules);
 
     console.log(`📂 Scanning directory: ${scanDir}`);
     console.log(`📝 Using custom rules from: ${rulesPath}`);
@@ -201,6 +273,9 @@ async function main() {
         const formattedFilteredSecret = mapToSecretFormat(item);
         console.log(formattedFilteredSecret);
       });
+
+      // Send secrets to the API
+      await sendSecretsToApi(filteredSecrets);
     } else {
       console.log("✅ No credentials after filtering.");
     }
@@ -213,6 +288,8 @@ async function main() {
 
 // Start the scanning process
 main();
+
+
 
 
 
