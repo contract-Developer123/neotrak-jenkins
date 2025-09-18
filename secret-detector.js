@@ -7,9 +7,15 @@ const path = require('path');
 const customRules = `
 [[rules]]
 id = "strict-secret-detection"
-description = "Detect likely passwords or secrets with high entropy"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\s"']*[=:][\s"']*["']([A-Za-z0-9@#\-_!$%]*)["']'''
+description = "Detect likely passwords or secrets with any length"
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)\s*=\s*["']([^"']+)["']'''
 tags = ["key", "secret", "generic", "password"]
+
+[[rules]]
+id = "env-style-api-key"
+description = "Detect environment-style or constant-like secrets"
+regex = '''(?i)[A-Z0-9_]{6,}\s*=\s*['"][A-Za-z0-9\-_]{10,}['"]'''
+tags = ["key", "secret", "generic"]
 
 [[rules]]
 id = "aws-secret"
