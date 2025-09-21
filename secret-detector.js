@@ -141,7 +141,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
 
     const filesToScan = files.map(file => `"${file}"`).join(' ');
-    const command = `"${gitleaksPath}" protect --no-git --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json --exclude=credentials_report_*.json --exclude=trivy_report_*.json ${filesToScan}`;
+    const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json --exclude=credentials_report_*.json --exclude=trivy_report_*.json ${filesToScan}`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
@@ -170,7 +170,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
       }
 
       if (error && error.code !== 1) {
-        reject(`❌ Error executing Gitleaks: ${stderr || error.message}`);
+        reject(new Error(`❌ Error executing Gitleaks: ${stderr || error.message}\nStack: ${error.stack}`));
         return;
       }
 
@@ -187,24 +187,22 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
     const filePath = path.join(dirPath, file);
     const fileName = path.basename(filePath);
 
-    console.log(`🔍 Evaluating file: ${filePath}`);
+    console.log(`🔍 Evaluating file or directory: ${filePath}`);
     if (
       skipFiles.some(skip => {
         const isSkipped = typeof skip === 'string' ? skip === fileName : skip.test(fileName);
-        if (isSkipped) console.log(`⏭️ Skipping: ${filePath}`);
+        if (isSkipped) console.log(`⏭️ Skipping file: ${filePath}`);
         return isSkipped;
       }) ||
-      fileName.startsWith('neotrak-jenkins') ||
-      file === 'node_modules' ||
-      file === '.git' ||
       (fs.statSync(filePath).isDirectory() && (
         file === 'node_modules' ||
         file === '.git' ||
+        file === 'neotrak-jenkins' ||
         file.startsWith('credentials_report') ||
-        file.startsWith('trivy_report') ||
-        file === 'neotrak-jenkins'
+        file.startsWith('trivy_report')
       ))
     ) {
+      console.log(`⏭️ Skipping directory: ${filePath}`);
       return;
     }
 
@@ -331,6 +329,7 @@ async function main() {
       ? result.filter(item =>
           !skipFiles.some(skip => typeof skip === 'string' ? skip === path.basename(item.File) : skip.test(path.basename(item.File))) &&
           !item.File.includes('node_modules') &&
+          !item.File.includes('neotrak-jenkins') &&
           !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
         )
       : [];
@@ -348,7 +347,7 @@ async function main() {
     }
 
   } catch (err) {
-    console.error("❌ Error during credential scan:", err.message || err);
+    console.error("❌ Error during credential scan:", err.message || err, `\nStack: ${err.stack}`);
     process.exit(1);
   }
 }
