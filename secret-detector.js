@@ -29,7 +29,7 @@ const skipFiles = [
   'requirements.txt',
   'README.md',
   '.gitignore',
-  'Jenkinsfile' // Added to skip secrets in Jenkinsfile (remove if not desired)
+  'Jenkinsfile',
 ];
 
 const customRules = `
@@ -121,49 +121,8 @@ function checkGitleaksInstalled() {
   });
 }
 
-// function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
-//   return new Promise((resolve, reject) => {
-//     const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json`;
-//     console.log(`🔍 Running Gitleaks:\n${command}`);
-
-//     exec(command, { shell: true }, (error, stdout, stderr) => {
-//       console.log('📤 Gitleaks STDOUT:\n', stdout);
-
-//       if (stdout) {
-//         const fileScanningRegex = /Scanning file: (.+)/g;
-//         let match;
-//         const scannedFiles = [];
-
-//         while ((match = fileScanningRegex.exec(stdout)) !== null) {
-//           scannedFiles.push(match[1]);
-//         }
-
-//         if (scannedFiles.length > 0) {
-//           console.log("🔍 Files being scanned for secrets:");
-//           scannedFiles.forEach(file => {
-//             console.log(`- ${file}`);
-//           });
-//         }
-//       }
-
-//       if (stderr && stderr.trim()) {
-//         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
-//       }
-
-//       // Handle Gitleaks exit codes (0: no leaks, 1: leaks found, others: errors)
-//       if (error && error.code !== 1) {
-//         reject(`❌ Error executing Gitleaks: ${stderr || error.message}`);
-//         return;
-//       }
-
-//       resolve();
-//     });
-//   });
-// }
-
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    // Get a list of all files in the current directory
     const files = getAllFiles(scanDir);
     
     if (files.length === 0) {
@@ -173,13 +132,10 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     }
 
     console.log("🔍 Scanning the following files:");
-
-    // Log the files being scanned
     files.forEach(file => {
       console.log(`- ${file}`);
     });
 
-    // Run Gitleaks on the files in the current directory
     const filesToScan = files.map(file => `"${file}"`).join(' ');
     const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
 
@@ -209,7 +165,6 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
       }
 
-      // Handle Gitleaks exit codes (0: no leaks, 1: leaks found, others: errors)
       if (error && error.code !== 1) {
         reject(`❌ Error executing Gitleaks: ${stderr || error.message}`);
         return;
@@ -220,36 +175,35 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   });
 }
 
-// Utility function to get all files in the directory recursively
 function getAllFiles(dirPath, arrayOfFiles = []) {
   const files = fs.readdirSync(dirPath);
 
   files.forEach(function(file) {
     const filePath = path.join(dirPath, file);
+    const fileName = path.basename(filePath);
 
-    // Skip specified folders and files
+    // Skip specified folders, files in skipFiles array, and files starting with credentials_report
     if (
-      file.startsWith('credentials_report') ||
-      file.startsWith('trivy_report') ||
-      file.startsWith('neotrak-jenkins') ||
+      skipFiles.includes(fileName) ||
+      fileName.startsWith('credentials_report') ||
+      fileName.startsWith('trivy_report') ||
+      fileName.startsWith('neotrak-jenkins') ||
       file === 'node_modules' ||
       file === '.git' ||
-      fs.statSync(filePath).isDirectory() && (
+      (fs.statSync(filePath).isDirectory() && (
         file === 'node_modules' ||
         file === '.git' ||
         file.startsWith('credentials_report') ||
         file.startsWith('trivy_report') ||
         file === 'neotrak-jenkins'
-      )
+      ))
     ) {
-      return; // Skip this file or directory
+      return;
     }
 
     if (fs.statSync(filePath).isDirectory()) {
-      // Recursively get files in subdirectories
       arrayOfFiles = getAllFiles(filePath, arrayOfFiles);
     } else {
-      // Add file to list if it's not in the skipped directories
       arrayOfFiles.push(filePath);
     }
   });
@@ -368,6 +322,7 @@ async function main() {
       ? result.filter(item =>
           !skipFiles.includes(path.basename(item.File)) &&
           !item.File.includes('node_modules') &&
+          !item.File.includes('credentials_report') &&
           !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
         )
       : [];
@@ -391,3 +346,8 @@ async function main() {
 }
 
 main();
+
+
+
+
+
