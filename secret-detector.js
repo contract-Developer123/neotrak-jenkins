@@ -29,48 +29,45 @@ const skipFiles = [
   'requirements.txt',
   'README.md',
   '.gitignore',
-  // 'Jenkinsfile',
   /^credentials_report_.*\.json$/,
   /^trivy_report_.*\.json$/,
-  // Add 'creds' if you want to skip the credentials file
-  // 'creds'
 ];
 
 const customRules = `
 [[rules]]
 id = "password"
 description = "Detect likely passwords"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9!@#$%^&*()_+=]{8,})["']'''
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[ \t]*[=:][ \t]*([A-Za-z0-9!@#$%^&*()_+=]+)'''
 tags = ["password", "key", "secret", "token"]
 
 [[rules]]
 id = "api-and-general-secrets"
 description = "Detect likely API keys and general secrets"
-regex = '''(?i)(X_API_KEY|X_SECRET_KEY|PROJECT_ID|WORKSPACE_ID|X_TENANT_KEY|access_token|secret_key|api_key|client_secret|aws_secret_access_key|GITHUB_TOKEN|JWT|Bearer)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{20,})["']'''
+regex = '''(?i)(X_API_KEY|X_SECRET_KEY|PROJECT_ID|WORKSPACE_ID|X_TENANT_KEY|access_token|secret_key|api_key|client_secret|aws_secret_access_key|GITHUB_TOKEN|JWT|Bearer)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
 tags = ["api_key", "secret", "env_var", "token", "jwt"]
 
 [[rules]]
 id = "jwt-token"
 description = "Detect JWT and OAuth tokens in the code"
-regex = '''(?i)(Bearer|JWT|access_token|id_token|oauth_token|oauth_access_token)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_\\.]{64,})["']'''
+regex = '''(?i)(Bearer|JWT|access_token|id_token|oauth_token|oauth_access_token)[ \t]*[=:][ \t]*([A-Za-z0-9-_\\.]+)'''
 tags = ["jwt", "token", "bearer", "oauth"]
 
 [[rules]]
 id = "private-key"
 description = "Detect private keys (RSA, DSA, etc.) in the code"
-regex = '''(?i)(private_key|api_private_key|client_private_key|rsa_private_key)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9+/=]{500,})["']'''
+regex = '''(?i)(private_key|api_private_key|client_private_key|rsa_private_key)[ \t]*[=:][ \t]*([A-Za-z0-9+/=]+)'''
 tags = ["private_key", "secret"]
 
 [[rules]]
 id = "client-secret"
 description = "Detect client secrets in the code"
-regex = '''(?i)(client_secret|consumer_secret)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{32,})["']'''
+regex = '''(?i)(client_secret|consumer_secret)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
 tags = ["client_secret", "secret"]
 
 [[rules]]
 id = "access-token"
 description = "Detect access tokens in the code"
-regex = '''(?i)(access_token|auth_token)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9-_+/=]{32,})["']'''
+regex = '''(?i)(access_token|auth_token)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
 tags = ["access_token", "token", "secret"]
 
 [[rules]]
@@ -138,10 +135,18 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     console.log("🔍 Scanning the following files:");
     files.forEach(file => {
       console.log(`- ${file}`);
+      // Log file content for debugging
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        console.log(`📄 Content of ${file}:\n${content}\n`);
+      } catch (err) {
+        console.error(`❌ Failed to read ${file}: ${err.message}`);
+      }
     });
 
     const filesToScan = files.map(file => `"${file}"`).join(' ');
     const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
