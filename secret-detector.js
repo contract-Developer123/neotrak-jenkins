@@ -29,7 +29,7 @@ const skipFiles = [
   'requirements.txt',
   'README.md',
   '.gitignore',
-  'Jenkinsfile',
+  // 'Jenkinsfile',
   /^credentials_report_.*\.json$/,
   /^trivy_report_.*\.json$/,
   // Add 'creds' if you want to skip the credentials file
@@ -141,8 +141,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
 
     const filesToScan = files.map(file => `"${file}"`).join(' ');
-    const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json --exclude=credentials_report_*.json --exclude=trivy_report_*.json ${filesToScan}`;
-
+    const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
