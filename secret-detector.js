@@ -30,6 +30,8 @@ const skipFiles = [
   'README.md',
   '.gitignore',
   'Jenkinsfile',
+  // Add 'creds' if you want to skip the credentials file
+  // 'creds'
 ];
 
 const customRules = `
@@ -38,6 +40,11 @@ id = "password"
 description = "Detect likely passwords"
 regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9!@#$%^&*()_+=]{8,})["']'''
 tags = ["password", "key", "secret", "token"]
+
+[[allowlists]]
+regexes = [
+  '''1233'''
+]
 
 [[rules]]
 id = "api-and-general-secrets"
@@ -137,7 +144,8 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
 
     const filesToScan = files.map(file => `"${file}"`).join(' ');
-    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+    // Remove --source to scan only specified files
+    const command = `"${gitleaksPath}" detect --no-git --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
@@ -182,10 +190,10 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
     const filePath = path.join(dirPath, file);
     const fileName = path.basename(filePath);
 
-    // Skip specified folders, files in skipFiles array, and files starting with credentials_report
+    // Skip specified folders, files in skipFiles, and files matching credentials_report_*.json
     if (
       skipFiles.includes(fileName) ||
-      fileName.startsWith('credentials_report') ||
+      /^credentials_report_.*\.json$/.test(fileName) ||
       fileName.startsWith('trivy_report') ||
       fileName.startsWith('neotrak-jenkins') ||
       file === 'node_modules' ||
@@ -322,7 +330,7 @@ async function main() {
       ? result.filter(item =>
           !skipFiles.includes(path.basename(item.File)) &&
           !item.File.includes('node_modules') &&
-          !item.File.includes('credentials_report') &&
+          !/^credentials_report_.*\.json$/.test(path.basename(item.File)) &&
           !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
         )
       : [];
@@ -346,8 +354,3 @@ async function main() {
 }
 
 main();
-
-
-
-
-
