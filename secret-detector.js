@@ -30,6 +30,9 @@ const skipFiles = [
   'README.md',
   '.gitignore',
   'Jenkinsfile',
+  // Pattern to skip files starting with credentials_report or trivy_report
+  /^credentials_report_.*\.json$/,
+  /^trivy_report_.*\.json$/,
   // Add 'creds' if you want to skip the credentials file
   // 'creds'
 ];
@@ -144,7 +147,6 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
 
     const filesToScan = files.map(file => `"${file}"`).join(' ');
-    // Remove --source to scan only specified files
     const command = `"${gitleaksPath}" detect --no-git --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
@@ -190,11 +192,9 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
     const filePath = path.join(dirPath, file);
     const fileName = path.basename(filePath);
 
-    // Skip specified folders, files in skipFiles, and files matching credentials_report_*.json
+    // Skip specified folders, files in skipFiles, and files matching patterns
     if (
-      skipFiles.includes(fileName) ||
-      /^credentials_report_.*\.json$/.test(fileName) ||
-      fileName.startsWith('trivy_report') ||
+      skipFiles.some(skip => typeof skip === 'string' ? skip === fileName : skip.test(fileName)) ||
       fileName.startsWith('neotrak-jenkins') ||
       file === 'node_modules' ||
       file === '.git' ||
@@ -297,13 +297,14 @@ async function main() {
   console.log('🧾 Detecting credentials in folder...');
   try {
     const scanDir = path.join(process.env.SCAN_DIR || process.cwd());
-    const reportPath = path.join(scanDir, `credentials_report_${Date.now()}.json`);
+    const reportPath = path.join(os.tmpdir(), `credentials_report_${Date.now()}.json`);
     const rulesPath = path.join(os.tmpdir(), 'gitleaks-custom-rules.toml');
 
     fs.writeFileSync(rulesPath, customRules);
 
     console.log(`📂 Scanning directory: ${scanDir}`);
     console.log(`📝 Using custom rules from: ${rulesPath}`);
+    console.log(`📄 Report will be saved to: ${reportPath}`);
 
     const gitleaksPath = await checkGitleaksInstalled();
     await runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath);
@@ -328,9 +329,8 @@ async function main() {
 
     const filteredSecrets = Array.isArray(result)
       ? result.filter(item =>
-          !skipFiles.includes(path.basename(item.File)) &&
+          !skipFiles.some(skip => typeof skip === 'string' ? skip === path.basename(item.File) : skip.test(path.basename(item.File))) &&
           !item.File.includes('node_modules') &&
-          !/^credentials_report_.*\.json$/.test(path.basename(item.File)) &&
           !/["']?\$\{?[A-Z0-9_]+\}?["']?/.test(item.Match)
         )
       : [];
