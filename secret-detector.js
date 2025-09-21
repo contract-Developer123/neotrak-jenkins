@@ -37,42 +37,42 @@ const customRules = `
 [[rules]]
 id = "password"
 description = "Detect likely passwords"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[ \t]*[=:][ \t]*([A-Za-z0-9!@#$%^&*()_+=]+)'''
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)\\s*[=:\\s]\\s*(['"]?)([A-Za-z0-9!@#$%^&*()_+\\-=[\\]{}|;:,.<>?]+)\\2[;]?\\s*'''
 tags = ["password", "key", "secret", "token"]
 
 [[rules]]
 id = "api-and-general-secrets"
-description = "Detect likely API keys and general secrets"
-regex = '''(?i)(X_API_KEY|X_SECRET_KEY|PROJECT_ID|WORKSPACE_ID|X_TENANT_KEY|access_token|secret_key|api_key|client_secret|aws_secret_access_key|GITHUB_TOKEN|JWT|Bearer)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
+description = "Detect API keys and general secrets including x-api-key"
+regex = '''(?i)(x-api-key|x_api_key|x-secret-key|x_secret_key|project-id|project_id|workspace-id|workspace_id|x-tenant-key|x_tenant_key|access_token|secret_key|api_key|client_secret|aws_secret_access_key|github_token|jwt|bearer)\\s*[=:\\s]\\s*(['"]?)([A-Za-z0-9-_+/=]+)\\2[;]?\\s*'''
 tags = ["api_key", "secret", "env_var", "token", "jwt"]
 
 [[rules]]
 id = "jwt-token"
-description = "Detect JWT and OAuth tokens in the code"
-regex = '''(?i)(Bearer|JWT|access_token|id_token|oauth_token|oauth_access_token)[ \t]*[=:][ \t]*([A-Za-z0-9-_\\.]+)'''
+description = "Detect JWT and OAuth tokens in key-value pairs"
+regex = '''(?i)(bearer|jwt|access_token|id_token|oauth_token|oauth_access_token)\\s*[=:\\s]\\s*(['"]?)([A-Za-z0-9-_\\.]+)\\2[;]?\\s*'''
 tags = ["jwt", "token", "bearer", "oauth"]
 
 [[rules]]
 id = "private-key"
 description = "Detect private keys (RSA, DSA, etc.) in the code"
-regex = '''(?i)(private_key|api_private_key|client_private_key|rsa_private_key)[ \t]*[=:][ \t]*([A-Za-z0-9+/=]+)'''
+regex = '''(?i)(private_key|api_private_key|client_private_key|rsa_private_key)\\s*[=:\\s]\\s*(['"]?)([A-Za-z0-9+/=]+)\\2[;]?\\s*'''
 tags = ["private_key", "secret"]
 
 [[rules]]
 id = "client-secret"
 description = "Detect client secrets in the code"
-regex = '''(?i)(client_secret|consumer_secret)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
+regex = '''(?i)(client_secret|consumer_secret)\\s*[=:\\s]\\s*(['"]?)([A-Za-z0-9-_+/=]+)\\2[;]?\\s*'''
 tags = ["client_secret", "secret"]
 
 [[rules]]
 id = "access-token"
 description = "Detect access tokens in the code"
-regex = '''(?i)(access_token|auth_token)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
+regex = '''(?i)(access_token|auth_token)\\s*[=:\\s]\\s*(['"]?)([A-Za-z0-9-_+/=]+)\\2[;]?\\s*'''
 tags = ["access_token", "token", "secret"]
 
 [[rules]]
-id = "jwt"
-description = "JSON Web Token"
+id = "jwt-standalone"
+description = "Detect standalone JSON Web Tokens"
 regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
 tags = ["token", "jwt"]
 `;
