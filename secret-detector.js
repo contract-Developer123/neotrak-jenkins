@@ -77,48 +77,43 @@ const skipFiles = [
 // tags = ["token", "jwt"]
 // `;
 
+// ✅ Stronger regex: avoids matching dummy values like "hello", "test123"
 const customRules = `
 [[rules]]
-id = "password"
-description = "Detect likely passwords"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[ \t]*[=:\s][ \t]*(['"])?[A-Za-z0-9!@#$%^&*()_+-=[]{}|;:,.<>?]+(?:[\s;]|['"])'''
-tags = ["password", "key", "secret", "token"]
+id = "strict-secret-detection"
+description = "Detect likely passwords or secrets with high entropy"
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
+tags = ["key", "secret", "generic", "password"]
 
 [[rules]]
-id = "api-and-general-secrets"
-description = "Detect API keys and general secrets including x-api-key"
-regex = '''(?i)(x-api-key|x_api_key|x-secret-key|x_secret_key|project-id|project_id|workspace-id|workspace_id|x-tenant-key|x_tenant_key|access_token|secret_key|api_key|client_secret|aws_secret_access_key|github_token|jwt|bearer)[ \t]*[=:\s][ \t]*(['"])?[A-Za-z0-9-_+/=]+(?:[\s;]|['"])'''
-tags = ["api_key", "secret", "env_var", "token", "jwt"]
+id = "aws-secret"
+description = "AWS Secret Access Key"
+regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
+tags = ["aws", "key", "secret"]
 
 [[rules]]
-id = "jwt-token"
-description = "Detect JWT and OAuth tokens in key-value pairs"
-regex = '''(?i)(bearer|jwt|access_token|id_token|oauth_token|oauth_access_token)[ \t]*[=:\s][ \t]*(['"])?[A-Za-z0-9-_\\.]+(?:[\s;]|['"])'''
-tags = ["jwt", "token", "bearer", "oauth"]
+id = "aws-key"
+description = "AWS Access Key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["aws", "key"]
 
 [[rules]]
-id = "private-key"
-description = "Detect private keys (RSA, DSA, etc.) in the code"
-regex = '''(?i)(private_key|api_private_key|client_private_key|rsa_private_key)[ \t]*[=:\s][ \t]*(['"])?[A-Za-z0-9+/=]+(?:[\s;]|['"])'''
-tags = ["private_key", "secret"]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[A-Za-z0-9_]{36}'''
+tags = ["github", "token"]
 
 [[rules]]
-id = "client-secret"
-description = "Detect client secrets in the code"
-regex = '''(?i)(client_secret|consumer_secret)[ \t]*[=:\s][ \t]*(['"])?[A-Za-z0-9-_+/=]+(?:[\s;]|['"])'''
-tags = ["client_secret", "secret"]
-
-[[rules]]
-id = "access-token"
-description = "Detect access tokens in the code"
-regex = '''(?i)(access_token|auth_token)[ \t]*[=:\s][ \t]*(['"])?[A-Za-z0-9-_+/=]+(?:[\s;]|['"])'''
-tags = ["access_token", "token", "secret"]
-
-[[rules]]
-id = "jwt-standalone"
-description = "Detect standalone JSON Web Tokens"
-regex = '''eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
+id = "jwt"
+description = "JSON Web Token"
+regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
 tags = ["token", "jwt"]
+
+[[rules]]
+id = "firebase-api-key"
+description = "Firebase API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["firebase", "apikey"]
 `;
 
 function checkGitleaksInstalled() {
