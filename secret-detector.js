@@ -226,10 +226,31 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
 
   files.forEach(function(file) {
     const filePath = path.join(dirPath, file);
+
+    // Skip specified folders and files
+    if (
+      file.startsWith('credentials_report') ||
+      file.startsWith('trivy_report') ||
+      file.startsWith('neotrak-jenkins') ||
+      file === 'node_modules' ||
+      file === '.git' ||
+      fs.statSync(filePath).isDirectory() && (
+        file === 'node_modules' ||
+        file === '.git' ||
+        file.startsWith('credentials_report') ||
+        file.startsWith('trivy_report') ||
+        file === 'neotrak-jenkins'
+      )
+    ) {
+      return; // Skip this file or directory
+    }
+
     if (fs.statSync(filePath).isDirectory()) {
-      arrayOfFiles = getAllFiles(filePath, arrayOfFiles);  // Recursively get files in subdirectories
+      // Recursively get files in subdirectories
+      arrayOfFiles = getAllFiles(filePath, arrayOfFiles);
     } else {
-      arrayOfFiles.push(filePath);  // Add file to list
+      // Add file to list if it's not in the skipped directories
+      arrayOfFiles.push(filePath);
     }
   });
 
