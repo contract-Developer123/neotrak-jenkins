@@ -163,67 +163,77 @@ function checkGitleaksInstalled() {
 
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    // Get the files changed in the latest commit
-    const commandGetChangedFiles = 'git diff --name-only HEAD^ HEAD';
-    exec(commandGetChangedFiles, { cwd: scanDir, shell: true }, (error, stdout, stderr) => {
-      if (error) {
-        reject(`❌ Error fetching changed files: ${stderr || error.message}`);
+    // Get a list of all files in the current directory
+    const files = getAllFiles(scanDir);
+    
+    if (files.length === 0) {
+      console.log("⚠️ No files found to scan in the current directory.");
+      resolve();
+      return;
+    }
+
+    console.log("🔍 Scanning the following files:");
+
+    // Log the files being scanned
+    files.forEach(file => {
+      console.log(`- ${file}`);
+    });
+
+    // Run Gitleaks on the files in the current directory
+    const filesToScan = files.map(file => `"${file}"`).join(' ');
+    const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+
+    console.log(`🔍 Running Gitleaks:\n${command}`);
+
+    exec(command, { shell: true }, (error, stdout, stderr) => {
+      console.log('📤 Gitleaks STDOUT:\n', stdout);
+
+      if (stdout) {
+        const fileScanningRegex = /Scanning file: (.+)/g;
+        let match;
+        const scannedFiles = [];
+
+        while ((match = fileScanningRegex.exec(stdout)) !== null) {
+          scannedFiles.push(match[1]);
+        }
+
+        if (scannedFiles.length > 0) {
+          console.log("🔍 Files being scanned for secrets:");
+          scannedFiles.forEach(file => {
+            console.log(`- ${file}`);
+          });
+        }
+      }
+
+      if (stderr && stderr.trim()) {
+        console.warn('⚠️ Gitleaks STDERR:\n', stderr);
+      }
+
+      // Handle Gitleaks exit codes (0: no leaks, 1: leaks found, others: errors)
+      if (error && error.code !== 1) {
+        reject(`❌ Error executing Gitleaks: ${stderr || error.message}`);
         return;
       }
 
-      const changedFiles = stdout.split('\n').filter(file => file.trim() !== '');
-      
-      if (changedFiles.length === 0) {
-        console.log("⚠️ No files have changed in the latest commit.");
-        resolve();
-        return;
-      }
-
-      console.log("🔍 Scanning the following changed files:");
-      changedFiles.forEach(file => {
-        console.log(`- ${file}`);
-      });
-
-      // Build the Gitleaks command to scan only the changed files
-      const filesToScan = changedFiles.map(file => `"${path.join(scanDir, file)}"`).join(' ');
-      const command = `"${gitleaksPath}" detect --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
-
-      console.log(`🔍 Running Gitleaks:\n${command}`);
-
-      exec(command, { shell: true }, (error, stdout, stderr) => {
-        console.log('📤 Gitleaks STDOUT:\n', stdout);
-
-        if (stdout) {
-          const fileScanningRegex = /Scanning file: (.+)/g;
-          let match;
-          const scannedFiles = [];
-
-          while ((match = fileScanningRegex.exec(stdout)) !== null) {
-            scannedFiles.push(match[1]);
-          }
-
-          if (scannedFiles.length > 0) {
-            console.log("🔍 Files being scanned for secrets:");
-            scannedFiles.forEach(file => {
-              console.log(`- ${file}`);
-            });
-          }
-        }
-
-        if (stderr && stderr.trim()) {
-          console.warn('⚠️ Gitleaks STDERR:\n', stderr);
-        }
-
-        // Handle Gitleaks exit codes (0: no leaks, 1: leaks found, others: errors)
-        if (error && error.code !== 1) {
-          reject(`❌ Error executing Gitleaks: ${stderr || error.message}`);
-          return;
-        }
-
-        resolve();
-      });
+      resolve();
     });
   });
+}
+
+// Utility function to get all files in the directory recursively
+function getAllFiles(dirPath, arrayOfFiles = []) {
+  const files = fs.readdirSync(dirPath);
+
+  files.forEach(function(file) {
+    const filePath = path.join(dirPath, file);
+    if (fs.statSync(filePath).isDirectory()) {
+      arrayOfFiles = getAllFiles(filePath, arrayOfFiles);  // Recursively get files in subdirectories
+    } else {
+      arrayOfFiles.push(filePath);  // Add file to list
+    }
+  });
+
+  return arrayOfFiles;
 }
 
 function checkReport(reportPath) {
