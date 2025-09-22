@@ -188,9 +188,18 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
         const command = `"${gitleaksPath}" detect --no-git --source="${file}" --report-path="${individualReportPath}" --config="${rulesPath}" --report-format=json --verbose`;
         console.log(`🚀 Running Gitleaks on file: ${file}`);
         console.log(`📝 Report: ${individualReportPath}`);
-        execSync(command, { stdio: 'inherit' });
-      }
 
+        try {
+          execSync(command, { stdio: 'inherit' });
+        } catch (error) {
+          // Exit code 1 means leaks found — that's expected!
+          if (error.status === 1) {
+            console.warn(`⚠️ Secrets found in ${file}. Continuing...`);
+          } else {
+            throw new Error(`❌ Failed to scan file ${file}: ${error.message}`);
+          }
+        }
+      }
       resolve();
     } catch (error) {
       reject(new Error(`❌ Error running Gitleaks: ${error.message}\nStack: ${error.stack}`));
