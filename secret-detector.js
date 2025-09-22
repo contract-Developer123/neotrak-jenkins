@@ -195,34 +195,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     // console.log(`📂   : ${filesToScan}`);
     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
 
-
-
-    // const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
-
-
-    for (const file of files) {
-      if (!file || file.trim() === '') {
-        console.warn('Skipping empty or invalid file path');
-        continue;
-      }
-      // optionally skip certain files:
-      if (file.includes('credentials_report')) {
-        console.log(`Skipping ${file}`);
-        continue;
-      }
-
-      const command = `gitleaks detect --no-git --source="${file}" --verbose`;
-      try {
-        execSync(command, { stdio: 'inherit' });
-      } catch (err) {
-        // Exit code 1 means leaks found - that's OK, so ignore this error
-        if (err.status !== 1) {
-          throw err;  // re-throw other errors
-        }
-        // Otherwise, just log that leaks were found
-        console.warn(`⚠️ Gitleaks found leaks in file: ${file}`);
-      }
-    }
+    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
