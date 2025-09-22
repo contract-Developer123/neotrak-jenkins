@@ -29,8 +29,8 @@ const skipFiles = [
   'requirements.txt',
   'README.md',
   '.gitignore',
-  /^credentials_report_.*\.json$/,
-  /^trivy_report_.*\.json$/,
+  /^credentials_report_.*\.json$/i,
+  /^trivy_report_.*\.json$/i,
 ];
 
 // const customRules = `
