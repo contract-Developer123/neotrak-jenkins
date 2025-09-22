@@ -187,7 +187,12 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     const filesToScan = files.map(file => `"${file}"`).join(' ');
     console.log(`📂 Files to be scanned: ${filesToScan}`);
     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
-      const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json ${filesToScan} --verbose`;
+    // const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
+
+    for (const file of filesToScan) {
+      const command = `"${gitleaksPath}" detect --no-git --source="${file}" --report-path="${getReportPathFor(file)}" --config="${rulesPath}" --report-format=json --verbose`;
+      execSync(command);
+    }
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
@@ -328,6 +333,7 @@ async function sendSecretsToApi(secretItems) {
 
     if (response.status >= 200 && response.status < 300) {
       console.log('✅ Secrets updated successfully in API.');
+      console.log('Response body:', response.status);
     } else {
       console.error(`❌ Failed to update secrets. Status: ${response.status}`);
       console.error('Response body:', response.data);
