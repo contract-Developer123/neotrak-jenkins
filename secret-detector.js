@@ -161,64 +161,114 @@ function checkGitleaksInstalled() {
   });
 }
 
+// function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
+//   return new Promise((resolve, reject) => {
+//     const files = getAllFiles(scanDir);
+
+//     if (files.length === 0) {
+//       console.log("⚠️ No files found to scan in the current directory.");
+//       resolve();
+//       return;
+//     }
+
+//     console.log("🔍 Scanning the following files:");
+//     files.forEach(file => {
+//       console.log(`- ${file}`);
+//       // Log file content for debugging
+//       try {
+//         const content = fs.readFileSync(file, 'utf8');
+//         console.log(`📄 Content of ${file}:\n${content}\n`);
+//       } catch (err) {
+//         console.error(`❌ Failed to read ${file}: ${err.message}`);
+//       }
+//     });
+
+//     const filesToScan = files.map(file => `"${file}"`).join(' ');
+//     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+//       const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
+
+//     console.log(`🔍 Running Gitleaks:\n${command}`);
+
+//     exec(command, { shell: true }, (error, stdout, stderr) => {
+//       console.log('📤 Gitleaks STDOUT:\n', stdout);
+
+//       if (stdout) {
+//         const fileScanningRegex = /Scanning file: (.+)/g;
+//         let match;
+//         const scannedFiles = [];
+
+//         while ((match = fileScanningRegex.exec(stdout)) !== null) {
+//           scannedFiles.push(match[1]);
+//         }
+
+//         if (scannedFiles.length > 0) {
+//           console.log("🔍 Files being scanned for secrets:");
+//           scannedFiles.forEach(file => {
+//             console.log(`- ${file}`);
+//           });
+//         }
+//       }
+
+//       if (stderr && stderr.trim()) {
+//         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
+//       }
+
+//       if (error && error.code !== 1) {
+//         reject(new Error(`❌ Error executing Gitleaks: ${stderr || error.message}\nStack: ${error.stack}`));
+//         return;
+//       }
+
+//       resolve();
+//     });
+//   });
+// }
+
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    const files = getAllFiles(scanDir);
+    const allFiles = getAllFiles(scanDir);
 
-    if (files.length === 0) {
-      console.log("⚠️ No files found to scan in the current directory.");
+    // ✅ Filter out report files and skip patterns
+    const filteredFiles = allFiles.filter(file => {
+      const fileName = path.basename(file);
+      const skip = skipFiles.some(skip =>
+        typeof skip === 'string' ? skip === fileName : skip.test(fileName)
+      );
+      if (skip) {
+        console.log(`⏭️ Skipping from Gitleaks input: ${file}`);
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredFiles.length === 0) {
+      console.log("⚠️ No valid files found to scan.");
       resolve();
       return;
     }
 
-    console.log("🔍 Scanning the following files:");
-    files.forEach(file => {
+    console.log("🔍 Files being passed to Gitleaks:");
+    filteredFiles.forEach(file => {
       console.log(`- ${file}`);
-      // Log file content for debugging
-      try {
-        const content = fs.readFileSync(file, 'utf8');
-        console.log(`📄 Content of ${file}:\n${content}\n`);
-      } catch (err) {
-        console.error(`❌ Failed to read ${file}: ${err.message}`);
-      }
     });
 
-    // const filesToScan = files.map(file => `"${file}"`).join(' ');
-    // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
-      // const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
-const filteredFiles = files.filter(file => !file.includes(reportPath));
-const filesToScan = filteredFiles.map(file => `"${file}"`).join(' ');
+    const filesToScan = filteredFiles.map(file => `"${file}"`).join(' ');
 
-const command = `"${gitleaksPath}" protect --no-banner --report-path="${reportPath}" --config="${rulesPath}" --report-format=json ${filesToScan}`;
+    // ✅ Correct command: gitleaks detect with --no-git and explicit files
+    const command = `"${gitleaksPath}" detect --no-git --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose ${filesToScan}`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
-      console.log('📤 Gitleaks STDOUT:\n', stdout);
-
-      if (stdout) {
-        const fileScanningRegex = /Scanning file: (.+)/g;
-        let match;
-        const scannedFiles = [];
-
-        while ((match = fileScanningRegex.exec(stdout)) !== null) {
-          scannedFiles.push(match[1]);
-        }
-
-        if (scannedFiles.length > 0) {
-          console.log("🔍 Files being scanned for secrets:");
-          scannedFiles.forEach(file => {
-            console.log(`- ${file}`);
-          });
-        }
+      if (stdout && stdout.trim()) {
+        console.log('📤 Gitleaks STDOUT:\n', stdout);
       }
-
       if (stderr && stderr.trim()) {
         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
       }
 
+      // Exit code 1 means leaks found (✅ not an error)
       if (error && error.code !== 1) {
-        reject(new Error(`❌ Error executing Gitleaks: ${stderr || error.message}\nStack: ${error.stack}`));
+        reject(new Error(`❌ Gitleaks failed: ${stderr || error.message}`));
         return;
       }
 
@@ -227,12 +277,6 @@ const command = `"${gitleaksPath}" protect --no-banner --report-path="${reportPa
   });
 }
 
-function shouldSkip(filePath) {
-  const fileName = path.basename(filePath);
-  return skipFiles.some(skip =>
-    typeof skip === 'string' ? skip === fileName : skip.test(fileName)
-  );
-}
 
 function getAllFiles(dirPath, arrayOfFiles = []) {
   console.log(`🔍 Checking directory: ${dirPath}`);
@@ -267,12 +311,6 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
       console.log(`✅ Adding to scan: ${filePath}`);
       arrayOfFiles.push(filePath);
     }
-
-    if (shouldSkip(filePath)) {
-      console.log(`⏭️ Skipping file: ${filePath}`);
-      return;
-    }
-
   });
 
   return arrayOfFiles;
