@@ -161,114 +161,62 @@ function checkGitleaksInstalled() {
   });
 }
 
-// function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
-//   return new Promise((resolve, reject) => {
-//     const files = getAllFiles(scanDir);
-
-//     if (files.length === 0) {
-//       console.log("⚠️ No files found to scan in the current directory.");
-//       resolve();
-//       return;
-//     }
-
-//     console.log("🔍 Scanning the following files:");
-//     files.forEach(file => {
-//       console.log(`- ${file}`);
-//       // Log file content for debugging
-//       try {
-//         const content = fs.readFileSync(file, 'utf8');
-//         console.log(`📄 Content of ${file}:\n${content}\n`);
-//       } catch (err) {
-//         console.error(`❌ Failed to read ${file}: ${err.message}`);
-//       }
-//     });
-
-//     const filesToScan = files.map(file => `"${file}"`).join(' ');
-//     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
-//       const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
-
-//     console.log(`🔍 Running Gitleaks:\n${command}`);
-
-//     exec(command, { shell: true }, (error, stdout, stderr) => {
-//       console.log('📤 Gitleaks STDOUT:\n', stdout);
-
-//       if (stdout) {
-//         const fileScanningRegex = /Scanning file: (.+)/g;
-//         let match;
-//         const scannedFiles = [];
-
-//         while ((match = fileScanningRegex.exec(stdout)) !== null) {
-//           scannedFiles.push(match[1]);
-//         }
-
-//         if (scannedFiles.length > 0) {
-//           console.log("🔍 Files being scanned for secrets:");
-//           scannedFiles.forEach(file => {
-//             console.log(`- ${file}`);
-//           });
-//         }
-//       }
-
-//       if (stderr && stderr.trim()) {
-//         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
-//       }
-
-//       if (error && error.code !== 1) {
-//         reject(new Error(`❌ Error executing Gitleaks: ${stderr || error.message}\nStack: ${error.stack}`));
-//         return;
-//       }
-
-//       resolve();
-//     });
-//   });
-// }
-
 function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   return new Promise((resolve, reject) => {
-    const allFiles = getAllFiles(scanDir);
+    const files = getAllFiles(scanDir);
 
-    // ✅ Filter out report files and skip patterns
-    const filteredFiles = allFiles.filter(file => {
-      const fileName = path.basename(file);
-      const skip = skipFiles.some(skip =>
-        typeof skip === 'string' ? skip === fileName : skip.test(fileName)
-      );
-      if (skip) {
-        console.log(`⏭️ Skipping from Gitleaks input: ${file}`);
-        return false;
-      }
-      return true;
-    });
-
-    if (filteredFiles.length === 0) {
-      console.log("⚠️ No valid files found to scan.");
+    if (files.length === 0) {
+      console.log("⚠️ No files found to scan in the current directory.");
       resolve();
       return;
     }
 
-    console.log("🔍 Files being passed to Gitleaks:");
-    filteredFiles.forEach(file => {
+    console.log("🔍 Scanning the following files:");
+    files.forEach(file => {
       console.log(`- ${file}`);
+      // Log file content for debugging
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        console.log(`📄 Content of ${file}:\n${content}\n`);
+      } catch (err) {
+        console.error(`❌ Failed to read ${file}: ${err.message}`);
+      }
     });
 
-    const filesToScan = filteredFiles.map(file => `"${file}"`).join(' ');
-
-    // ✅ Correct command: gitleaks detect with --no-git and explicit files
-    const command = `"${gitleaksPath}" detect --no-git --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose ${filesToScan}`;
+    console.log(`📂 Total files to scan: ${scanDir}`);
+    const filesToScan = files.map(file => `"${file}"`).join(' ');
+    console.log(`📂 Files to be scanned: ${filesToScan}`);
+    // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+      const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json ${filesToScan} --verbose`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
     exec(command, { shell: true }, (error, stdout, stderr) => {
-      if (stdout && stdout.trim()) {
-        console.log('📤 Gitleaks STDOUT:\n', stdout);
+      console.log('📤 Gitleaks STDOUT:\n', stdout);
+
+      if (stdout) {
+        const fileScanningRegex = /Scanning file: (.+)/g;
+        let match;
+        const scannedFiles = [];
+
+        while ((match = fileScanningRegex.exec(stdout)) !== null) {
+          scannedFiles.push(match[1]);
+        }
+
+        if (scannedFiles.length > 0) {
+          console.log("🔍 Files being scanned for secrets:");
+          scannedFiles.forEach(file => {
+            console.log(`- ${file}`);
+          });
+        }
       }
+
       if (stderr && stderr.trim()) {
         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
       }
 
-      // Exit code 1 means leaks found (✅ not an error)
       if (error && error.code !== 1) {
-        reject(new Error(`❌ Gitleaks failed: ${stderr || error.message}`));
+        reject(new Error(`❌ Error executing Gitleaks: ${stderr || error.message}\nStack: ${error.stack}`));
         return;
       }
 
@@ -276,7 +224,6 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
   });
 }
-
 
 function getAllFiles(dirPath, arrayOfFiles = []) {
   console.log(`🔍 Checking directory: ${dirPath}`);
