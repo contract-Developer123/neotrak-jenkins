@@ -184,7 +184,8 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
 
     const filesToScan = files.map(file => `"${file}"`).join(' ');
-    const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+    // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
