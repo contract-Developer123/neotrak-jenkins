@@ -191,23 +191,21 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     });
 
     console.log(`📂 Total files to scan: ${scanDir}`);
-    const filesToScan = files.map(file => `"${file}"`).join(' ');
-    console.log(`📂   : ${filesToScan}`);
+    // const filesToScan = files.map(file => `"${file}"`).join(' ');
+    // console.log(`📂   : ${filesToScan}`);
     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
+
+
 
     // const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
 
-    // for (const file of filesToScan) {
-    //   const command = `"${gitleaksPath}" detect --no-git --source="${file}" --report-path="${getReportPathFor(file)}" --config="${rulesPath}" --report-format=json --verbose`;
-    //   execSync(command);
-    // }
 
-    for (const file of filesToScan) {
+    for (const file of files) {
       if (!file || file.trim() === '') {
         console.warn('Skipping empty or invalid file path');
         continue;
       }
-
+      // optionally skip certain files:
       if (file.includes('credentials_report')) {
         console.log(`Skipping ${file}`);
         continue;
