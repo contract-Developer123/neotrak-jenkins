@@ -183,9 +183,13 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
       }
     });
 
-    const filesToScan = files.map(file => `"${file}"`).join(' ');
+    // const filesToScan = files.map(file => `"${file}"`).join(' ');
     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
-    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
+      // const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
+const filteredFiles = files.filter(file => !file.includes(reportPath));
+const filesToScan = filteredFiles.map(file => `"${file}"`).join(' ');
+
+const command = `"${gitleaksPath}" protect --no-banner --report-path="${reportPath}" --config="${rulesPath}" --report-format=json ${filesToScan}`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
@@ -223,6 +227,13 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
   });
 }
 
+function shouldSkip(filePath) {
+  const fileName = path.basename(filePath);
+  return skipFiles.some(skip =>
+    typeof skip === 'string' ? skip === fileName : skip.test(fileName)
+  );
+}
+
 function getAllFiles(dirPath, arrayOfFiles = []) {
   console.log(`🔍 Checking directory: ${dirPath}`);
   const files = fs.readdirSync(dirPath);
@@ -256,6 +267,12 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
       console.log(`✅ Adding to scan: ${filePath}`);
       arrayOfFiles.push(filePath);
     }
+
+    if (shouldSkip(filePath)) {
+      console.log(`⏭️ Skipping file: ${filePath}`);
+      return;
+    }
+
   });
 
   return arrayOfFiles;
