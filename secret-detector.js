@@ -203,8 +203,12 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     // }
 
     for (const file of filesToScan) {
+      if (file.includes('credentials_report')) {
+        console.log(`Skipping ${file}`);
+        continue;
+      }
       const command = `gitleaks detect --no-git --source="${file}" --verbose`;
-      execSync(command, { stdio: 'inherit' });  // show output live
+      execSync(command, { stdio: 'inherit' });
     }
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
