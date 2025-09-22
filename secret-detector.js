@@ -212,7 +212,16 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
       }
 
       const command = `gitleaks detect --no-git --source="${file}" --verbose`;
-      execSync(command, { stdio: 'inherit' });
+      try {
+        execSync(command, { stdio: 'inherit' });
+      } catch (err) {
+        // Exit code 1 means leaks found - that's OK, so ignore this error
+        if (err.status !== 1) {
+          throw err;  // re-throw other errors
+        }
+        // Otherwise, just log that leaks were found
+        console.warn(`⚠️ Gitleaks found leaks in file: ${file}`);
+      }
     }
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
