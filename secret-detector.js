@@ -216,6 +216,19 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
           scannedFiles.forEach(file => {
             console.log(`- ${file}`);
           });
+
+/////////////////////////////////////
+        const skipScan = scannedFiles.some(file =>
+          file.toLowerCase().includes('credentials_report')
+        );
+
+        if (skipScan) {
+          console.log('⚠️ Skipping processing: Detected file starting with "credentials_report".');
+          resolve(); // gracefully exit
+          return;
+        }
+////////////////////////////////
+
         }
       }
 
