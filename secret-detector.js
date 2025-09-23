@@ -1,4 +1,4 @@
-const { exec, execSync } = require('child_process');
+const { exec, execSync , spawn} = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -213,10 +213,34 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     // console.log(`📂   : ${filesToScan}`);
     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
 
-    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
+    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
+     console.log(`🔍 Running Gitleaks: ${gitleaksPath} ${args.join(' ')}`);
+
+    const child = spawn(gitleaksPath, args, { shell: true });
+
+    child.stdout.on('data', data => {
+      process.stdout.write(data); // stream directly
+    });
+
+    child.stderr.on('data', data => {
+      process.stderr.write(data); // stream directly
+    });
+
+    child.on('close', code => {
+      if (code === 0 || code === 1) {
+        resolve();
+      } else {
+        reject(new Error(`Gitleaks exited with code ${code}`));
+      }
+    });
+
+    child.on('error', err => {
+      reject(err);
+    });
+  
     exec(command, { shell: true }, (error, stdout, stderr) => {
       console.log('📤 Gitleaks STDOUT:\n', stdout);
 
