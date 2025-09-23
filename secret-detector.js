@@ -202,13 +202,31 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     exec(command, { shell: true }, (error, stdout, stderr) => {
       console.log('📤 Gitleaks STDOUT:\n', stdout);
 
-      if (stdout) {
+       // ✅ 1. Check for any actual findings reported from unwanted files (e.g., credentials_report)
+  const fileLineRegex = /File:\s+(.*)/g;
+  let match;
+  const reportedFiles = [];
+
+  while ((match = fileLineRegex.exec(stdout)) !== null) {
+    reportedFiles.push(match[1].trim());
+  }
+
+  const skipFindingReport = reportedFiles.some(file =>
+    path.basename(file).toLowerCase().startsWith('credentials_report')
+  );
+
+  if (skipFindingReport) {
+    console.log('⚠️ Skipping processing: Findings reported in a "credentials_report_*.json" file.');
+    resolve(); // graceful exit
+    return;
+  }
+      // if (stdout) {
         const fileScanningRegex = /Scanning file: (.+)/g;
-        let match;
+        let scanMatch;
         const scannedFiles = [];
 
-        while ((match = fileScanningRegex.exec(stdout)) !== null) {
-          scannedFiles.push(match[1]);
+        while ((scanMatch = fileScanningRegex.exec(stdout)) !== null) {
+          scannedFiles.push(scanMatch[1].trim());
         }
 
         if (scannedFiles.length > 0) {
@@ -216,21 +234,18 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
           scannedFiles.forEach(file => {
             console.log(`- ${file}`);
           });
-
-/////////////////////////////////////
-        const skipScan = scannedFiles.some(file =>
-          file.toLowerCase().includes('credentials_report')
-        );
-
-        if (skipScan) {
-          console.log('⚠️ Skipping processing: Detected file starting with "credentials_report".');
-          resolve(); // gracefully exit
-          return;
         }
-////////////////////////////////
+/////
+          const skipScan = scannedFiles.some(file =>
+    path.basename(file).toLowerCase().startsWith('credentials_report')
+  );
 
-        }
-      }
+  if (skipScan) {
+    console.log('⚠️ Skipping processing: File scanned with name "credentials_report_*.json".');
+    resolve(); // graceful exit
+    return;
+  }
+      // }
 
       if (stderr && stderr.trim()) {
         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
