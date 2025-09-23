@@ -286,8 +286,24 @@ function checkReport(reportPath) {
   });
 }
 
+// function fixFilePath(filePath) {
+//   return path.normalize(filePath);
+// }
+
 function fixFilePath(filePath) {
-  return path.normalize(filePath);
+    if (!filePath) return '///////'; // 7 slashes = 8 empty segments
+
+    let segments = filePath.split('/');
+    const requiredSegments = 8;
+
+    // Count only actual segments; empty strings from leading/trailing slashes are valid
+    const nonEmptyCount = segments.filter(Boolean).length;
+
+    while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
+        segments.unshift('');
+    }
+
+    return segments.join('/');
 }
 
 function mapToSecretFormat(item) {
