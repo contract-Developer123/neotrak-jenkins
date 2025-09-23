@@ -147,7 +147,7 @@ function checkGitleaksInstalled() {
     }
 
     const command = 'where gitleaks';
-    exec(command, { shell: true, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    exec(command, { shell: true, maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
       if (!error && stdout) {
         const gitleaksPath = stdout.trim().split('\n')[0];
         if (gitleaksPath.toLowerCase().includes('system32')) {
