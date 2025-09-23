@@ -1,4 +1,4 @@
-const { exec, execSync , spawn} = require('child_process');
+const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -34,74 +34,12 @@ const skipFiles = [
 ];
 
 // ✅ Stronger regex: avoids matching dummy values like "hello", "test123"
-// const customRules = `
-// [[rules]]
-// id = "strict-secret-detection"
-// description = "Detect likely passwords or secrets with high entropy"
-// regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
-// tags = ["key", "secret", "generic", "password"]
-
-// [[rules]]
-// id = "aws-secret"
-// description = "AWS Secret Access Key"
-// regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
-// tags = ["aws", "key", "secret"]
-
-// [[rules]]
-// id = "aws-key"
-// description = "AWS Access Key ID"
-// regex = '''AKIA[0-9A-Z]{16}'''
-// tags = ["aws", "key"]
-
-// [[rules]]
-// id = "github-token"
-// description = "GitHub Personal Access Token"
-// regex = '''ghp_[A-Za-z0-9_]{36}'''
-// tags = ["github", "token"]
-
-// [[rules]]
-// id = "jwt"
-// description = "JSON Web Token"
-// regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
-// tags = ["token", "jwt"]
-
-// [[rules]]
-// id = "firebase-api-key"
-// description = "Firebase API Key"
-// regex = '''AIza[0-9A-Za-z\\-_]{35}'''
-// tags = ["firebase", "apikey"]
-// `;
-
 const customRules = `
 [[rules]]
 id = "strict-secret-detection"
 description = "Detect likely passwords or secrets with high entropy"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access|credential|private)[\\s"']*[=:][\\s"']*["']?([A-Za-z0-9@#\\-_$%!+=/]{10,})["']?'''
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
 tags = ["key", "secret", "generic", "password"]
-
-[[rules]]
-id = "base64-secret"
-description = "Detect base64-encoded secrets"
-regex = '''["']?([A-Za-z0-9+/=]{32,})["']?'''
-tags = ["base64", "secret"]
-
-[[rules]]
-id = "uuid-id-detection"
-description = "Detect hardcoded UUIDs often used as IDs"
-regex = '''\\b[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\b'''
-tags = ["id", "uuid", "identifier"]
-
-[[rules]]
-id = "hardcoded-x-secret-key"
-description = "Detect hardcoded X_SECRET_KEY variable"
-regex = '''X_SECRET_KEY\\s*=\\s*['"][A-Za-z0-9+/=]{20,}['"]'''
-tags = ["secret", "x-secret"]
-
-[[rules]]
-id = "workspace-id"
-description = "Detect WORKSPACE_ID or PROJECT_ID assignments"
-regex = '''(WORKSPACE_ID|PROJECT_ID)\\s*=\\s*['"][a-f0-9-]{36}['"]'''
-tags = ["id", "workspace", "project"]
 
 [[rules]]
 id = "aws-secret"
@@ -124,7 +62,7 @@ tags = ["github", "token"]
 [[rules]]
 id = "jwt"
 description = "JSON Web Token"
-regex = '''eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
+regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
 tags = ["token", "jwt"]
 
 [[rules]]
@@ -147,7 +85,7 @@ function checkGitleaksInstalled() {
     }
 
     const command = 'where gitleaks';
-    exec(command, { shell: true, maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
+    exec(command, { shell: true }, (error, stdout, stderr) => {
       if (!error && stdout) {
         const gitleaksPath = stdout.trim().split('\n')[0];
         if (gitleaksPath.toLowerCase().includes('system32')) {
@@ -213,34 +151,10 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     // console.log(`📂   : ${filesToScan}`);
     // const command = `"${gitleaksPath}" protect --report-path="${reportPath}" --config="${rulesPath}" --no-banner --verbose --report-format=json ${filesToScan}`;
 
-    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json`;
+    const command = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --report-path="${reportPath}" --config="${rulesPath}" --report-format=json --verbose`;
 
     console.log(`🔍 Running Gitleaks:\n${command}`);
 
-     console.log(`🔍 Running Gitleaks: ${gitleaksPath} ${args.join(' ')}`);
-
-    const child = spawn(gitleaksPath, args, { shell: true });
-
-    child.stdout.on('data', data => {
-      process.stdout.write(data); // stream directly
-    });
-
-    child.stderr.on('data', data => {
-      process.stderr.write(data); // stream directly
-    });
-
-    child.on('close', code => {
-      if (code === 0 || code === 1) {
-        resolve();
-      } else {
-        reject(new Error(`Gitleaks exited with code ${code}`));
-      }
-    });
-
-    child.on('error', err => {
-      reject(err);
-    });
-  
     exec(command, { shell: true }, (error, stdout, stderr) => {
       console.log('📤 Gitleaks STDOUT:\n', stdout);
 
@@ -333,19 +247,19 @@ function checkReport(reportPath) {
 // }
 
 function fixFilePath(filePath) {
-    if (!filePath) return '///////'; // 7 slashes = 8 empty segments
+  if (!filePath) return '///////'; // 7 slashes = 8 empty segments
 
-    let segments = filePath.split('/');
-    const requiredSegments = 8;
+  let segments = filePath.split('/');
+  const requiredSegments = 8;
 
-    // Count only actual segments; empty strings from leading/trailing slashes are valid
-    const nonEmptyCount = segments.filter(Boolean).length;
+  // Count only actual segments; empty strings from leading/trailing slashes are valid
+  const nonEmptyCount = segments.filter(Boolean).length;
 
-    while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
-        segments.unshift('');
-    }
+  while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
+    segments.unshift('');
+  }
 
-    return segments.join('/');
+  return segments.join('/');
 }
 
 function mapToSecretFormat(item) {
