@@ -187,11 +187,28 @@ function filterSecrets(results) {
   });
 }
 
+function fixFilePath(filePath) {
+  if (!filePath) return '///////'; // 7 slashes = 8 empty segments
+
+  let segments = filePath.split('/');
+  const requiredSegments = 8;
+
+  // Count only actual segments; empty strings from leading/trailing slashes are valid
+  const nonEmptyCount = segments.filter(Boolean).length;
+
+  while (nonEmptyCount + segments.length - nonEmptyCount < requiredSegments) {
+    segments.unshift('');
+  }
+
+  return segments.join('/');
+}
+
 function mapToApiFormat(item) {
+  const fixedFile = fixFilePath(item.File);
   return {
     RuleID: item.RuleID,
     Description: item.Description,
-    File: path.normalize(item.File),
+    File: fixedFile,
     Match: item.Match,
     Secret: item.Secret,
     StartLine: String(item.StartLine ?? ''),
