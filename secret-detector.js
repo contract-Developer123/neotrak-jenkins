@@ -33,57 +33,75 @@ const skipFiles = [
   /^trivy_report_.*\.json$/i,
 ];
 
+// ✅ Stronger regex: avoids matching dummy values like "hello", "test123"
 // const customRules = `
 // [[rules]]
-// id = "password"
-// description = "Detect likely passwords"
-// regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[ \t]*[=:][ \t]*([A-Za-z0-9!@#$%^&*()_+=]+)'''
-// tags = ["password", "key", "secret", "token"]
+// id = "strict-secret-detection"
+// description = "Detect likely passwords or secrets with high entropy"
+// regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
+// tags = ["key", "secret", "generic", "password"]
 
 // [[rules]]
-// id = "api-and-general-secrets"
-// description = "Detect likely API keys and general secrets"
-// regex = '''(?i)(X_API_KEY|X_SECRET_KEY|PROJECT_ID|WORKSPACE_ID|X_TENANT_KEY|access_token|secret_key|api_key|client_secret|aws_secret_access_key|GITHUB_TOKEN|JWT|Bearer)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
-// tags = ["api_key", "secret", "env_var", "token", "jwt"]
+// id = "aws-secret"
+// description = "AWS Secret Access Key"
+// regex = '''(?i)aws(.{0,20})?(secret|access)?(.{0,20})?['"][0-9a-zA-Z/+]{40}['"]'''
+// tags = ["aws", "key", "secret"]
 
 // [[rules]]
-// id = "jwt-token"
-// description = "Detect JWT and OAuth tokens in the code"
-// regex = '''(?i)(Bearer|JWT|access_token|id_token|oauth_token|oauth_access_token)[ \t]*[=:][ \t]*([A-Za-z0-9-_\\.]+)'''
-// tags = ["jwt", "token", "bearer", "oauth"]
+// id = "aws-key"
+// description = "AWS Access Key ID"
+// regex = '''AKIA[0-9A-Z]{16}'''
+// tags = ["aws", "key"]
 
 // [[rules]]
-// id = "private-key"
-// description = "Detect private keys (RSA, DSA, etc.) in the code"
-// regex = '''(?i)(private_key|api_private_key|client_private_key|rsa_private_key)[ \t]*[=:][ \t]*([A-Za-z0-9+/=]+)'''
-// tags = ["private_key", "secret"]
-
-// [[rules]]
-// id = "client-secret"
-// description = "Detect client secrets in the code"
-// regex = '''(?i)(client_secret|consumer_secret)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
-// tags = ["client_secret", "secret"]
-
-// [[rules]]
-// id = "access-token"
-// description = "Detect access tokens in the code"
-// regex = '''(?i)(access_token|auth_token)[ \t]*[=:][ \t]*([A-Za-z0-9-_+/=]+)'''
-// tags = ["access_token", "token", "secret"]
+// id = "github-token"
+// description = "GitHub Personal Access Token"
+// regex = '''ghp_[A-Za-z0-9_]{36}'''
+// tags = ["github", "token"]
 
 // [[rules]]
 // id = "jwt"
 // description = "JSON Web Token"
 // regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
 // tags = ["token", "jwt"]
+
+// [[rules]]
+// id = "firebase-api-key"
+// description = "Firebase API Key"
+// regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+// tags = ["firebase", "apikey"]
 // `;
 
-// ✅ Stronger regex: avoids matching dummy values like "hello", "test123"
 const customRules = `
 [[rules]]
 id = "strict-secret-detection"
 description = "Detect likely passwords or secrets with high entropy"
-regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access)[\\s"']*[=:][\\s"']*["']([A-Za-z0-9@#\\-_$%!]{10,})["']'''
+regex = '''(?i)(password|passwd|pwd|secret|key|token|auth|access|credential|private)[\\s"']*[=:][\\s"']*["']?([A-Za-z0-9@#\\-_$%!+=/]{10,})["']?'''
 tags = ["key", "secret", "generic", "password"]
+
+[[rules]]
+id = "base64-secret"
+description = "Detect base64-encoded secrets"
+regex = '''["']?([A-Za-z0-9+/=]{32,})["']?'''
+tags = ["base64", "secret"]
+
+[[rules]]
+id = "uuid-id-detection"
+description = "Detect hardcoded UUIDs often used as IDs"
+regex = '''\\b[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\b'''
+tags = ["id", "uuid", "identifier"]
+
+[[rules]]
+id = "hardcoded-x-secret-key"
+description = "Detect hardcoded X_SECRET_KEY variable"
+regex = '''X_SECRET_KEY\\s*=\\s*['"][A-Za-z0-9+/=]{20,}['"]'''
+tags = ["secret", "x-secret"]
+
+[[rules]]
+id = "workspace-id"
+description = "Detect WORKSPACE_ID or PROJECT_ID assignments"
+regex = '''(WORKSPACE_ID|PROJECT_ID)\\s*=\\s*['"][a-f0-9-]{36}['"]'''
+tags = ["id", "workspace", "project"]
 
 [[rules]]
 id = "aws-secret"
@@ -106,7 +124,7 @@ tags = ["github", "token"]
 [[rules]]
 id = "jwt"
 description = "JSON Web Token"
-regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
+regex = '''eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
 tags = ["token", "jwt"]
 
 [[rules]]
@@ -202,31 +220,13 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     exec(command, { shell: true }, (error, stdout, stderr) => {
       console.log('📤 Gitleaks STDOUT:\n', stdout);
 
-       // ✅ 1. Check for any actual findings reported from unwanted files (e.g., credentials_report)
-  const fileLineRegex = /File:\s+(.*)/g;
-  let match;
-  const reportedFiles = [];
-
-  while ((match = fileLineRegex.exec(stdout)) !== null) {
-    reportedFiles.push(match[1].trim());
-  }
-
-  const skipFindingReport = reportedFiles.some(file =>
-    path.basename(file).toLowerCase().startsWith('credentials_report')
-  );
-
-  if (skipFindingReport) {
-    console.log('⚠️ Skipping processing: Findings reported in a "credentials_report_*.json" file.');
-    resolve(); // graceful exit
-    return;
-  }
-      // if (stdout) {
+      if (stdout) {
         const fileScanningRegex = /Scanning file: (.+)/g;
-        let scanMatch;
+        let match;
         const scannedFiles = [];
 
-        while ((scanMatch = fileScanningRegex.exec(stdout)) !== null) {
-          scannedFiles.push(scanMatch[1].trim());
+        while ((match = fileScanningRegex.exec(stdout)) !== null) {
+          scannedFiles.push(match[1]);
         }
 
         if (scannedFiles.length > 0) {
@@ -235,17 +235,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
             console.log(`- ${file}`);
           });
         }
-/////
-          const skipScan = scannedFiles.some(file =>
-    path.basename(file).toLowerCase().startsWith('credentials_report')
-  );
-
-  if (skipScan) {
-    console.log('⚠️ Skipping processing: File scanned with name "credentials_report_*.json".');
-    resolve(); // graceful exit
-    return;
-  }
-      // }
+      }
 
       if (stderr && stderr.trim()) {
         console.warn('⚠️ Gitleaks STDERR:\n', stderr);
