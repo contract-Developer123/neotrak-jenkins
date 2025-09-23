@@ -66,6 +66,18 @@ regex = '''eyJ[A-Za-z0-9-_]+\\.eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+'''
 tags = ["token", "jwt"]
 
 [[rules]]
+id = "uuid"
+description = "Generic UUIDs"
+regex = '''[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'''
+tags = ["uuid", "id", "generic"]
+
+[[rules]]
+id = "base64-secret"
+description = "Generic Base64 Encoded Secret"
+regex = '''(?i)(secret|key|token|auth)[\\s"']*[=:][\\s"']*['"]([A-Za-z0-9+/]{32,}={0,2})['"]'''
+tags = ["base64", "secret", "key"]
+
+[[rules]]
 id = "firebase-api-key"
 description = "Firebase API Key"
 regex = '''AIza[0-9A-Za-z\\-_]{35}'''
