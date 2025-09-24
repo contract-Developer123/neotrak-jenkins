@@ -120,7 +120,6 @@ function getAllFiles(dir, array = []) {
     // Skip unwanted files/folders
     if (shouldSkip(fullPath) || ['node_modules', '.git', 'neotrak-jenkins'].includes(file)) {
       // For debugging
-      // console.log(`⏭️ Skipping: ${fullPath}`);
       continue;
     }
 
@@ -145,7 +144,7 @@ function runGitleaks(scanDir, reportPath, rulesPath, gitleaksPath) {
     const cmd = `"${gitleaksPath}" detect --no-git --source="${scanDir}" --config="${rulesPath}" --report-path="${reportPath}" --report-format=json --verbose`;
 
     exec(cmd, { shell: true, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
-      if (stdout) console.log(`Gitleaks output:\n${stdout}`);
+      // if (stdout) console.log(`Gitleaks output:\n${stdout}`);
       if (stderr) console.warn(`Gitleaks stderr:\n${stderr}`);
 
       if (error && error.code !== 1) { // gitleaks returns exit code 1 on leaks found - not an error for us
