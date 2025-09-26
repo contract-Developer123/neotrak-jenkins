@@ -460,7 +460,8 @@ function generateSBOM() {
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
 
   // Use proper escape syntax for Windows paths and quotes
-  const command = `npx cdxgen . -o "${sbomPath}" --exclude "neotrak-jenkins/**" --exclude "node_modules/**"`;
+  // const command = `npx cdxgen . -o "${sbomPath}" --exclude "neotrak-jenkins/**" --exclude "node_modules/**"`;
+const command = `npx cdxgen . -o "${sbomPath}" --exclude "neotrak-jenkins/**" --exclude "node_modules/**"`;
 
   runCommand(command, async (err, stdout, stderr) => {
     if (err) {
