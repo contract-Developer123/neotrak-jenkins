@@ -697,3 +697,4 @@ function checkAndGenerateSBOM() {
 }
 
 checkAndGenerateSBOM();
+
