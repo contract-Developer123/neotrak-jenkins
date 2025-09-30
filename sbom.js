@@ -669,7 +669,7 @@ function generateSBOM() {
     printPackageJsonContent();
     
     // Generate SBOM using CycloneDX (cdxgen)
-    const command = `npx cdxgen . -o "${sbomPath}" --exclude "node_modules/**" --spec-version 1.4 --no-dev-dependencies`;
+    const command = `npx cdxgen . -o "${sbomPath}" --exclude "node_modules/**" --spec-version 1.4`;
     runCommand(command, async (err, stdout, stderr) => {
       if (err) {
         console.error(`❌ Failed to generate SBOM: ${err.message}`);
