@@ -662,11 +662,13 @@ function generateSBOM() {
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
   console.log(`🛠️ Generating SBOM for: ${projectRoot}`);
 
-  // Check if it's a Node.js project (package.json) or Java (pom.xml)
+  // Check if it's a Node.js project (package.json)
   if (foundManifests.includes('package.json')) {
     console.log('📦 Detected Node.js project');
     // Print content of package.json file
     printPackageJsonContent();
+    
+    // Generate SBOM using CycloneDX (cdxgen)
     const command = `npx cdxgen . -o "${sbomPath}" --exclude "node_modules/**" --spec-version 1.4 --no-dev-dependencies`;
     runCommand(command, async (err, stdout, stderr) => {
       if (err) {
@@ -680,6 +682,7 @@ function generateSBOM() {
     });
   }
 
+  // Check if it's a Java (Maven) project (pom.xml)
   if (foundManifests.includes('pom.xml')) {
     console.log('📦 Detected Java (Maven) project');
     const command = `npx cdxgen pom.xml -o "${sbomPath}" --exclude "target/**" --spec-version 1.4 --no-dev-dependencies`;
