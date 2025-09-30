@@ -492,6 +492,9 @@
 
 // checkAndGenerateSBOM();
 
+
+
+
 const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -566,6 +569,17 @@ function installCdxgen(callback) {
     if (stderr) console.error(stderr);
     callback();
   });
+}
+
+// Read and print content of package.json file
+function printPackageJsonContent() {
+  const packageJsonPath = path.join(projectRoot, 'package.json');
+  if (fs.existsSync(packageJsonPath)) {
+    const content = fs.readFileSync(packageJsonPath, 'utf8');
+    console.log(`📄 Content of package.json:\n${content}`);
+  } else {
+    console.error(`❌ 'package.json' not found in the project directory.`);
+  }
 }
 
 // Upload SBOM to the server
@@ -651,6 +665,8 @@ function generateSBOM() {
   // Check if it's a Node.js project (package.json) or Java (pom.xml)
   if (foundManifests.includes('package.json')) {
     console.log('📦 Detected Node.js project');
+    // Print content of package.json file
+    printPackageJsonContent();
     const command = `npx cdxgen . -o "${sbomPath}" --exclude "node_modules/**" --spec-version 1.4 --no-dev-dependencies`;
     runCommand(command, async (err, stdout, stderr) => {
       if (err) {
@@ -697,4 +713,3 @@ function checkAndGenerateSBOM() {
 }
 
 checkAndGenerateSBOM();
-
