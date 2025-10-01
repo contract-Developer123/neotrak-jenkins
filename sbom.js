@@ -362,18 +362,15 @@ async function uploadSBOM() {
       console.log('✅ Filtered unwanted components from SBOM');
       console.log(`📋 Filtered SBOM Components Count: ${sbomContent.components.length}`);
 
-      // console.log('🧹 Filtered component names:');
-      // sbomContent.components.forEach(c => console.log(`- ${c.name}`));
-
       await fsPromises.writeFile(sbomPath, JSON.stringify(sbomContent, null, 2));
     }
 
     if (!sbomContent.components || sbomContent.components.length === 0) {
-  console.warn('⚠️ Warning: SBOM contains 0 components after filtering. Skipping upload.');
-  process.exit(0);
-} else {
-  console.log(`📦 Final SBOM component count to upload: ${sbomContent.components.length}`);
-}
+      console.warn('⚠️ Warning: SBOM contains 0 components after filtering. Skipping upload.');
+      process.exit(0);
+    } else {
+      console.log(`📦 Final SBOM component count to upload: ${sbomContent.components.length}`);
+    }
 
     const form = new FormData();
     form.append('sbomFile', fs.createReadStream(sbomPath));
@@ -420,6 +417,20 @@ async function uploadSBOM() {
     }
   } catch (err) {
     console.error('❌ Failed to process or upload SBOM', err);
+    if (err.response) {
+      // Server responded with a status code
+      console.error(`🚨 HTTP ${err.response.status}: ${err.response.statusText}`);
+      console.error('🔍 Response data:', JSON.stringify(err.response.data, null, 2));
+    } else if (err.request) {
+      // No response received
+      console.error('📡 No response received from the server.');
+      console.error(err.request);
+    } else {
+      // Something else caused the error
+      console.error('💥 Unexpected Error:', err.message);
+    }
+
+    console.error('🧵 Stack trace:\n', err.stack);
     process.exit(1);
   }
 }
@@ -432,7 +443,7 @@ function generateSBOM() {
   }
   console.log(`🔍 Found manifest file(s): ${foundManifests.join(', ')}`);
 
-   console.log(`🛠️ Preparing environment for SBOM generation...`);
+  console.log(`🛠️ Preparing environment for SBOM generation...`);
 
   // If package.json is found, run npm install
   if (foundManifests.includes('package.json')) {
