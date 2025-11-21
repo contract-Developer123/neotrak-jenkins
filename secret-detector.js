@@ -105,25 +105,69 @@ tags = ["firebase", "apikey"]
 //   });
 // }
 
-// Ensure Gitleaks is installed and available in the PATH
+// Ensure Gitleaks is installed and available
 function checkGitleaksInstalled() {
   return new Promise((resolve, reject) => {
-    const command = os.platform() === 'win32' ? 'where gitleaks' : 'which gitleaks'; // `which` for Unix-based systems, `where` for Windows
-
+    const command = os.platform() === 'win32' ? 'where gitleaks' : 'which gitleaks'; // Use `which` or `where` depending on platform
     try {
-      // Check if gitleaks is available in the system PATH
-      execSync(command, { stdio: 'ignore' }); // Execute silently, no output
-
-      // Check if Gitleaks is executable by fetching the version
+      execSync(command, { stdio: 'ignore' }); // Execute silently to check if gitleaks is available in PATH
       const version = execSync('gitleaks --version', { encoding: 'utf8' });
       console.log(`✅ Gitleaks found: ${version.trim()}`);
-      resolve('gitleaks');
+      resolve('gitleaks'); // Return gitleaks path or identifier
     } catch (err) {
-      // If gitleaks is not found in PATH, reject with a descriptive error
-      reject(new Error('❌ Gitleaks not found in PATH. Please install Gitleaks.'));
+      console.log('❌ Gitleaks not found. Attempting to install...');
+      installGitleaks().then(resolve).catch(reject);
     }
   });
 }
+
+// Install Gitleaks based on the OS
+function installGitleaks() {
+  return new Promise((resolve, reject) => {
+    const platform = os.platform();
+    if (platform === 'win32') {
+      console.log('⚙️ Installing Gitleaks for Windows...');
+      try {
+        execSync('choco install gitleaks -y', { stdio: 'inherit' });
+        resolve('gitleaks');
+      } catch (err) {
+        console.log('⚠️ Chocolatey not found. Attempting direct download...');
+        downloadGitleaksWindows().then(resolve).catch(reject);
+      }
+    } else if (platform === 'darwin' || platform === 'linux') {
+      console.log(`⚙️ Installing Gitleaks for ${platform}...`);
+      try {
+        if (platform === 'darwin') {
+          execSync('brew install gitleaks', { stdio: 'inherit' });
+        } else {
+          execSync('curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64.tar.gz | tar xz -C /usr/local/bin', { stdio: 'inherit' });
+        }
+        resolve('gitleaks');
+      } catch (err) {
+        reject(new Error(`❌ Failed to install Gitleaks: ${err.message}`));
+      }
+    } else {
+      reject(new Error(`❌ Unsupported platform: ${platform}`));
+    }
+  });
+}
+
+// Download Gitleaks for Windows if Chocolatey is not available
+function downloadGitleaksWindows() {
+  return new Promise((resolve, reject) => {
+    const downloadUrl = 'https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-windows-amd64.exe';
+    const filePath = path.join('C:', 'gitleaks.exe');
+    try {
+      execSync(`curl -L ${downloadUrl} -o ${filePath}`, { stdio: 'inherit' });
+      execSync(`move ${filePath} C:\\Windows\\System32\\gitleaks.exe`, { stdio: 'inherit' });
+      resolve('gitleaks');
+    } catch (err) {
+      reject(new Error(`❌ Failed to download or install Gitleaks on Windows: ${err.message}`));
+    }
+  });
+}
+
+
 
 // Recursively get files to scan, skipping those matching skipPatterns or certain directories
 function getAllFiles(dir, array = []) {
