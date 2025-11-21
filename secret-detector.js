@@ -125,26 +125,30 @@ function checkGitleaksInstalled() {
 function installGitleaks() {
   return new Promise((resolve, reject) => {
     const platform = os.platform();
-    if (platform === 'win32') {
-      console.log('⚙️ Installing Gitleaks for Windows...');
+    
+    if (platform === 'linux' || platform === 'darwin') {
+      console.log(`⚙️ Installing Gitleaks on ${platform}...`);
+      const downloadUrl = 'https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64.tar.gz';
+      const tmpFilePath = path.join(os.tmpdir(), 'gitleaks-linux-amd64.tar.gz'); // Temporary path to save the downloaded file
+      
       try {
-        execSync('choco install gitleaks -y', { stdio: 'inherit' });
-        resolve('gitleaks');
-      } catch (err) {
-        console.log('⚠️ Chocolatey not found. Attempting direct download...');
-        downloadGitleaksWindows().then(resolve).catch(reject);
-      }
-    } else if (platform === 'darwin' || platform === 'linux') {
-      console.log(`⚙️ Installing Gitleaks for ${platform}...`);
-      try {
-        if (platform === 'darwin') {
-          execSync('brew install gitleaks', { stdio: 'inherit' });
-        } else {
-          execSync('curl -sSL https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64.tar.gz | tar xz -C /usr/local/bin', { stdio: 'inherit' });
-        }
+        // Step 1: Download the file
+        console.log('⬇️ Downloading Gitleaks binary...');
+        execSync(`curl -L ${downloadUrl} -o ${tmpFilePath}`, { stdio: 'inherit' });
+        
+        // Step 2: Verify if the file is a valid .tar.gz
+        console.log('📦 Extracting Gitleaks binary...');
+        execSync(`tar -xzvf ${tmpFilePath} -C /usr/local/bin`, { stdio: 'inherit' });
+        
+        console.log('✅ Gitleaks installed successfully');
         resolve('gitleaks');
       } catch (err) {
         reject(new Error(`❌ Failed to install Gitleaks: ${err.message}`));
+      } finally {
+        // Clean up the downloaded file (if the download was successful)
+        if (fs.existsSync(tmpFilePath)) {
+          fs.unlinkSync(tmpFilePath);
+        }
       }
     } else {
       reject(new Error(`❌ Unsupported platform: ${platform}`));
