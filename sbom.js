@@ -483,7 +483,7 @@ function generateSBOM() {
     '--exclude "node_modules/**"'
   ].join(' ');
 
-  runCommand(`npx cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4 --no-dev-dependencies`, async (err, stdout, stderr) => {
+  runCommand(`npx @cyclonedx/cdxgen "${projectRoot}" -o "${sbomPath}" ${excludeFlags} --spec-version 1.4 --no-dev-dependencies`, async (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to generate SBOM: ${err.message}`);
       return;
@@ -497,7 +497,7 @@ function generateSBOM() {
 
 function checkAndGenerateSBOM() {
   console.log('🔍 Checking if CDxGen is already installed...');
-  runCommand('npx cdxgen --version', (err, stdout, stderr) => {
+  runCommand('npx @cyclonedx/cdxgen --version', (err, stdout, stderr) => {
     if (!err) {
       console.log(`✅ CDxGen is already installed: ${stdout}`);
       generateSBOM();
