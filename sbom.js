@@ -59,38 +59,38 @@ function runCommand(cmd, callback) {
   });
 }
 
-// function installCdxgen(callback) {
-//   console.log('📦 Installing CDxGen...');
-//   runCommand('npm install --no-save @cyclonedx/cdxgen@latest', (err, stdout, stderr) => {
-//     if (err) {
-//       console.error(`❌ Failed to install CDxGen: ${err.message}`);
-//       return;
-//     }
-//     console.log(stdout);
-//     if (stderr) console.error(stderr);
-//     callback();
-//   });
-// }
-
 function installCdxgen(callback) {
   console.log('📦 Installing CDxGen...');
-
-  // Ensure using the public npm registry (if needed)
-  const installCmd = 'npm install --no-save @cyclonedx/cdxgen@latest --registry=https://registry.npmjs.org/';
-
-  runCommand(installCmd, (err, stdout, stderr) => {
+  runCommand('npm install --no-save @cyclonedx/cdxgen@latest', (err, stdout, stderr) => {
     if (err) {
       console.error(`❌ Failed to install CDxGen: ${err.message}`);
-      console.error('Possible causes: incorrect registry, no internet access, or issues with NPM cache.');
       return;
     }
     console.log(stdout);
-    if (stderr) {
-      console.error('⚠️ stderr output:', stderr);
-    }
+    if (stderr) console.error(stderr);
     callback();
   });
 }
+
+// function installCdxgen(callback) {
+//   console.log('📦 Installing CDxGen...');
+
+//   // Ensure using the public npm registry (if needed)
+//   const installCmd = 'npm install --no-save @cyclonedx/cdxgen@latest --registry=https://registry.npmjs.org/';
+
+//   runCommand(installCmd, (err, stdout, stderr) => {
+//     if (err) {
+//       console.error(`❌ Failed to install CDxGen: ${err.message}`);
+//       console.error('Possible causes: incorrect registry, no internet access, or issues with NPM cache.');
+//       return;
+//     }
+//     console.log(stdout);
+//     if (stderr) {
+//       console.error('⚠️ stderr output:', stderr);
+//     }
+//     callback();
+//   });
+// }
 
 async function uploadSBOM() {
   try {
