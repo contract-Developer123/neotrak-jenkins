@@ -125,29 +125,44 @@ function checkGitleaksInstalled() {
 function installGitleaks() {
   return new Promise((resolve, reject) => {
     const platform = os.platform();
-    
+
     if (platform === 'linux' || platform === 'darwin') {
       console.log(`⚙️ Installing Gitleaks on ${platform}...`);
-      const downloadUrl = 'https://github.com/zricethezav/gitleaks/releases/latest/download/gitleaks-linux-amd64.tar.gz';
-      const tmpFilePath = path.join(os.tmpdir(), 'gitleaks-linux-amd64.tar.gz'); // Temporary path to save the downloaded file
-      
+      const gitleaksVersion = '8.21.2'; // Specify exact version
+      const downloadUrl = `https://github.com/gitleaks/gitleaks/releases/download/v${gitleaksVersion}/gitleaks_${gitleaksVersion}_linux_x64.tar.gz`;
+      const tmpFilePath = path.join(os.tmpdir(), 'gitleaks.tar.gz');
+      const tmpDir = path.join(os.tmpdir(), 'gitleaks-extract');
+
       try {
-        // Step 1: Download the file
+        // Step 1: Download the file with -L to follow redirects
         console.log('⬇️ Downloading Gitleaks binary...');
-        execSync(`curl -L ${downloadUrl} -o ${tmpFilePath}`, { stdio: 'inherit' });
-        
-        // Step 2: Verify if the file is a valid .tar.gz
+        execSync(`curl -sSfL ${downloadUrl} -o ${tmpFilePath}`, { stdio: 'inherit' });
+
+        // Step 2: Create temporary extraction directory
+        if (!fs.existsSync(tmpDir)) {
+          fs.mkdirSync(tmpDir);
+        }
+
+        // Step 3: Extract to temporary directory
         console.log('📦 Extracting Gitleaks binary...');
-        execSync(`tar -xzvf ${tmpFilePath} -C /usr/local/bin`, { stdio: 'inherit' });
-        
+        execSync(`tar -xzf ${tmpFilePath} -C ${tmpDir}`, { stdio: 'inherit' });
+
+        // Step 4: Move binary to /usr/local/bin
+        console.log('📥 Installing Gitleaks to /usr/local/bin...');
+        execSync(`mv ${tmpDir}/gitleaks /usr/local/bin/gitleaks`, { stdio: 'inherit' });
+        execSync(`chmod +x /usr/local/bin/gitleaks`, { stdio: 'inherit' });
+
         console.log('✅ Gitleaks installed successfully');
         resolve('gitleaks');
       } catch (err) {
         reject(new Error(`❌ Failed to install Gitleaks: ${err.message}`));
       } finally {
-        // Clean up the downloaded file (if the download was successful)
+        // Clean up the downloaded file and temp directory
         if (fs.existsSync(tmpFilePath)) {
           fs.unlinkSync(tmpFilePath);
+        }
+        if (fs.existsSync(tmpDir)) {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
         }
       }
     } else {
