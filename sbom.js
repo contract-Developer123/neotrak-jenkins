@@ -36,6 +36,13 @@ const apiUrlBase = 'https://dev.neotrak.io/open-pulse/project';
 const projectRoot = process.cwd();
 const sbomPath = path.resolve(projectRoot, 'sbom.json');
 
+// ✅ ADD THIS CODE HERE - Add Maven to PATH if running in Jenkins
+const mavenHome = process.env.MAVEN_HOME || '/var/jenkins_home/tools/hudson.tasks.Maven_MavenInstallation/Maven_installations';
+if (fs.existsSync(mavenHome)) {
+  process.env.PATH = `${path.join(mavenHome, 'bin')}:${process.env.PATH}`;
+  console.log(`✅ Added Maven to PATH: ${mavenHome}/bin`);
+}
+
 console.log(`📂 Listing files in directory: ${projectRoot}`);
 fs.readdirSync(projectRoot).forEach(file => {
   console.log(`- ${file}`);
